@@ -8,6 +8,10 @@ https://www.youtube.com/user/PhyrexianNFM
 The latest version is always availible at
 https://bitbucket.org/Phyrexian/ra1-dist/downloads/
 
+RESETTING PROGRESS
+If you have completed the game (or even if you haven't) and you would like to
+start from scratch again, just delete the cookies folder (it will automatically recreate itself).
+
 CHANGING KEY BINDINGS
 You can change the key bindings by creating a file with the name KeySettings.txt
 Inside it, you write 1 binding per 1 line, in the form
