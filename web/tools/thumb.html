@@ -1,0 +1,135 @@
+<!doctype html>
+<!--
+  Turntable renderer for the archive landing page.
+
+  Draws one of the game's own models with the game's own renderer — a real
+  ContO through Plane.d, over the select screen's hangar backdrop — so the
+  thumbnail cannot drift from what the game actually looks like.
+
+  Driven by web/tools/render-thumb.mjs over the DevTools protocol:
+  window.__render(yawDegrees) draws a frame and returns it as a data URL.
+
+  Camera: pitched down `elev` degrees and pulled back along that direction, so
+  the model is seen from above at a fixed elevation while it yaws underneath —
+  a turntable, with the backdrop held still.
+-->
+<meta charset="utf-8">
+<title>ra1 turntable</title>
+<style>
+  body { margin: 0; background: #111; }
+  canvas { display: block; image-rendering: pixelated; }
+</style>
+<canvas id="c" width="600" height="480"></canvas>
+<script type="module">
+  import { Medium } from '../Medium.js';
+  import { ContO } from '../ContO.js';
+  import { JImage } from '../graphics.js';
+  import * as vfs from '../vfs.js';
+
+  const REPO = new URL('../../', import.meta.url).href;
+  const W = 600, H = 480;
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const g = new JImage(canvas).getGraphics();
+
+  vfs.setFpath(REPO);
+  // readZip reads from the byte cache, so the zip has to be fetched first.
+  await vfs.preload(['graphics/models.zrad']);
+  await vfs.preloadZip('graphics/models.zrad');
+  const zip = vfs.zipEntries('graphics/models.zrad');
+
+  const cfg = Object.assign({
+    model: 'spit.rad',
+    elev: 45,          // camera elevation, degrees above the horizon
+    dist: 620,         // camera distance from the model
+    panx: 0,           // projection-centre pan, screen pixels
+    pany: 0,
+    zoom: 1,           // scales focus_point: >1 fills more of the frame
+  }, window.__cfg || {});
+
+  const m = new Medium();
+  // The game's projection is written against a 500x360 frame; the thumbnail is
+  // 600x480, so the principal point and the viewport move with it. Everything
+  // else about the transform is untouched.
+  m.w = W;
+  m.h = H;
+  m.cx = W / 2;
+  m.cy = H / 2;
+  m.focus_point = Math.round(400 * cfg.zoom);
+  m.ground = 250;
+
+  const entry = zip.find((e) => e.name === cfg.model);
+  if (!entry) throw new Error(`no model ${cfg.model} in models.zrad — have ${zip.map((e) => e.name).join(', ')}`);
+  const conto = new ContO(entry.bytes, m, 0, 0, 0);
+  conto.out = false;
+
+  conto.x = 0;
+  conto.y = 0;
+  conto.z = 0;
+  conto.xy = 0;
+  conto.zy = 0;
+
+  // Camera: pitch down by `elev` and stand back along that line, plus a pan
+  // (dx, dy) in world units. A model's geometry is not centred on its own
+  // origin — the .rad files put the origin wherever the author did — so the
+  // pan is solved for by the driver from the measured bounding box rather than
+  // assumed to be zero.
+  function place() {
+    const rad = (cfg.elev * Math.PI) / 180;
+    m.xz = 0;
+    m.zy = Math.round(cfg.elev);
+    m.focus_point = Math.round(400 * cfg.zoom);
+    // Framing pans the PRINCIPAL POINT rather than the camera, so the same
+    // driver frames both games (nfm's car is pinned to a ground plane derived
+    // from the camera, where a camera pan cancels itself out).
+    m.cx = Math.round(W / 2 + cfg.panx);
+    m.cy = Math.round(H / 2 + cfg.pany);
+    // NOT -m.cx: cx carries the framing pan, and feeding it back here would
+    // cancel the pan out exactly, leaving the framing loop with no response to
+    // solve against.
+    m.x = Math.round(-W / 2);
+    m.y = Math.round(-cfg.dist * Math.sin(rad));
+    m.z = Math.round(-cfg.dist * Math.cos(rad));
+  }
+  place();
+
+  window.__cam = (patch) => {
+    Object.assign(cfg, patch);
+    place();
+    return JSON.stringify({ cam: [m.x, m.y, m.z, m.zy], fp: m.focus_point, cfg });
+  };
+
+  window.__render = (yaw) => {
+    conto.xz = ((Math.round(yaw) % 360) + 360) % 360;
+    // Black: the landing page composites these itself.
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    conto.d(g);
+    return canvas.toDataURL('image/png');
+  };
+
+  // Bounding box of what the model rasterises, for the driver to frame with.
+  window.__measure = (yaw) => {
+    const rec = {
+      minx: 1e9, miny: 1e9, maxx: -1e9, maxy: -1e9, polys: 0,
+      note(x, y) { if (x < this.minx) this.minx = x; if (y < this.miny) this.miny = y;
+                   if (x > this.maxx) this.maxx = x; if (y > this.maxy) this.maxy = y; },
+      setColor() {}, fillRect() {}, drawRect() {}, drawString() {}, drawImage() {},
+      fillPolygon(xs, ys, n) { this.polys++; for (let i = 0; i < n; i++) this.note(xs[i], ys[i]); },
+      drawPolygon(xs, ys, n) { this.polys++; for (let i = 0; i < n; i++) this.note(xs[i], ys[i]); },
+      drawLine(a, b, c, d) { this.polys++; this.note(a, b); this.note(c, d); },
+    };
+    conto.xz = ((Math.round(yaw) % 360) + 360) % 360;
+    conto.d(rec);
+    return JSON.stringify({
+      polys: rec.polys,
+      bbox: [rec.minx, rec.miny, rec.maxx, rec.maxy],
+      size: [rec.maxx - rec.minx, rec.maxy - rec.miny],
+      centre: [(rec.minx + rec.maxx) / 2, (rec.miny + rec.maxy) / 2],
+      maxR: conto.maxR, npl: conto.npl,
+    });
+  };
+
+  window.__ready = true;
+</script>
