@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Radical Aces</title>
+<link rel="icon" href="../graphics/icon.png">
 <style>
   /* The game is a fixed 500x360 offscreen image blitted by F51.paint(). The
      page scales that up with nearest-neighbour so the chunky 2001 look
@@ -43,6 +44,31 @@
     z-index: 2;
   }
   #gesture p { text-align: center; letter-spacing: .04em; }
+  /* The game's own icon, at 2x its 48px so it is not a smudge on a hidpi
+     screen; nearest-neighbour to keep the 2001 pixels. */
+  #brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  #brand img {
+    width: 96px;
+    height: 96px;
+    image-rendering: pixelated;
+  }
+  #brand h1 {
+    margin: 0;
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: .10em;
+    color: #dbe4ef;
+  }
+  #brand .sub {
+    margin: 4px 0 0;
+    font-size: 12px;
+    letter-spacing: .04em;
+    color: #6f7c8a;
+  }
   #gesture .panel {
     display: flex;
     flex-direction: column;
@@ -98,7 +124,13 @@
      and gives the canvas keyboard focus. -->
 <div id="gesture">
   <div class="panel">
-    <p>RADICAL ACES</p>
+    <div id="brand">
+      <img src="../graphics/icon.png" alt="">
+      <div>
+        <h1>RADICAL ACES</h1>
+        <p class="sub">Omar Waly, 2001 &mdash; ported to the browser</p>
+      </div>
+    </div>
     <div id="opts">
       <label>
         <input type="checkbox" id="opt-res">

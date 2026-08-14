@@ -15,7 +15,7 @@
 // so "it rendered" has to be measured, not assumed.
 
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -111,6 +111,7 @@ writeFileSync(OUT, Buffer.from(shot.data, 'base64'));
 
 // The game opens on "Click here to Start" (F51.mon), so a smoke run that never
 // clicks only ever proves the loading path. Click, wait, and shoot again.
+let keyShot = 0;
 if (process.env.SMOKE_CLICK !== '0') {
   await send('Runtime.evaluate', {
     expression: `document.getElementById('screen').dispatchEvent(
@@ -118,15 +119,52 @@ if (process.env.SMOKE_CLICK !== '0') {
   });
   await sleep(Number(process.env.SMOKE_CLICK_WAIT || 6) * 1000);
 
+  // SMOKE_EVAL runs arbitrary JS in the page after the click — for jumping the
+  // menu state machine straight to the screen under investigation.
+  if (process.env.SMOKE_EVAL) {
+    const r = await send('Runtime.evaluate', { expression: process.env.SMOKE_EVAL, returnByValue: true });
+    console.log('eval:', JSON.stringify(r.result?.value ?? r.result?.description ?? null));
+    await sleep(Number(process.env.SMOKE_EVAL_WAIT || 4) * 1000);
+    const es = await send('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(OUT.replace(/\.png$/, '-eval.png'), Buffer.from(es.data, 'base64'));
+  }
+
   // Optional key presses: SMOKE_KEYS="10,10" sends those AWT codes through the
   // page's real keydown/keyup listeners, a few seconds apart.
   for (const code of (process.env.SMOKE_KEYS || '').split(',').filter(Boolean)) {
-    const key = code === '10' ? 'Enter' : code === '32' ? ' ' : String.fromCharCode(Number(code));
+    // AWT codes back to DOM key names (input.js does the reverse). The four
+    // arrows are Event constants, not characters, so they need naming.
+    const NAMED = { 10: 'Enter', 27: 'Escape', 32: ' ', 9: 'Tab',
+                    1004: 'ArrowUp', 1005: 'ArrowDown', 1006: 'ArrowLeft', 1007: 'ArrowRight' };
+    const key = NAMED[code] || String.fromCharCode(Number(code));
     await send('Runtime.evaluate', {
       expression: `window.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, bubbles: true }));
                    setTimeout(() => window.dispatchEvent(new KeyboardEvent('keyup', { key: ${JSON.stringify(key)}, bubbles: true })), 120);`,
     });
     await sleep(Number(process.env.SMOKE_KEY_WAIT || 4) * 1000);
+    // A shot after every key, so a menu screen can be found without guessing
+    // how many presses away it is.
+    keyShot++;
+    const ks = await send('Page.captureScreenshot', { format: 'png' });
+    writeFileSync(OUT.replace(/\.png$/, `-key${keyShot}.png`), Buffer.from(ks.data, 'base64'));
+    const st = await send('Runtime.evaluate', {
+      expression: `({ fase: window.__game?.f?._xt?.fase, sel: window.__game?.f?._xt?.selected })`,
+      returnByValue: true,
+    });
+    console.log(`after key ${keyShot}: fase=${st.result.value.fase} selected=${st.result.value.sel}`);
+  }
+  // SMOKE_EVAL_FILE_AFTER runs once the key presses are done, i.e. on the
+  // screen they navigated to.
+  if (process.env.SMOKE_EVAL_FILE_AFTER) {
+    const src = readFileSync(process.env.SMOKE_EVAL_FILE_AFTER, 'utf8');
+    // No awaitPromise: an eval that navigates the page destroys its own
+    // execution context, and the reply never arrives.
+    const r = await Promise.race([
+      send('Runtime.evaluate', { expression: src, returnByValue: true, awaitPromise: true }),
+      sleep(8000).then(() => null),
+    ]);
+    console.log('eval-after: ' + (r === null ? '(no reply — the page navigated?)'
+      : (r.result?.value ?? r.result?.description ?? JSON.stringify(r))));
   }
   const shot2 = await send('Page.captureScreenshot', { format: 'png' });
   writeFileSync(OUT.replace(/\.png$/, '-after-click.png'), Buffer.from(shot2.data, 'base64'));

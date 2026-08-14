@@ -23,6 +23,7 @@
 // KeySettings.txt is written in those numbers, so input.js maps DOM keys back
 // to them rather than inventing a new scheme. See its header.
 
+import { captureScalars, restoreScalars } from './snapshot.js';
 import { trunc, parseIntJava, colorOf, intArray, random, startRandomRecording, startRandomReplay, stopRandom } from './java.js';
 import * as vfs from './vfs.js';
 import * as assets from './assets.js';
@@ -912,9 +913,18 @@ export class F51 {
     this.gamer = null;
   }
 
+  /**
+   * Java's Desktop.browse() — the game calls it once, to open winner/ after
+   * the final mission.
+   *
+   * NAVIGATES THE CURRENT PAGE rather than opening a tab: a window.open() here
+   * is a popup the browser blocks, and the game has already stopped its loop
+   * and painted "One moment..." by this point, so it would sit on that screen
+   * forever. The URL is resolved against the repo root, like every other asset.
+   */
   open(url) {
     if (typeof window !== 'undefined') {
-      window.open(url, '_blank');
+      window.location.href = new URL(url, REPO).href;
     }
   }
 
@@ -1217,9 +1227,9 @@ export class F51 {
     // Thread priority (this.gamer.setPriority(10)) has no browser JS equivalent.
     const medium = new Medium();
     const xtgraphics = new xtGraphics(medium, this.rd);
-    // Diagnostics handle for port/tools/smoke.mjs: xtgraphics is a local of
-    // run(), and its per-frame counters are how a smoke run checks that
-    // interpolated frames advance no animation state.
+    // Diagnostics handles for port/tools/smoke.mjs: xtgraphics and the object
+    // array are locals of run(), and they are what a smoke run has to read to
+    // check per-frame counters or what is actually on screen.
     this._xt = xtgraphics;
     let i = 5;
     const s = "1.8";
@@ -1240,6 +1250,7 @@ export class F51 {
     this.lstat("Preparing for loading...", 0);
     const aconto = new Array(53).fill(null);
     const aconto2 = new Array(3000).fill(null);
+    this._aconto = aconto2;
     const usercraft = new userCraft(medium);
     const atank = new Array(20).fill(null);
     let j = 0;
@@ -1326,6 +1337,31 @@ export class F51 {
       snap.cam.z = medium.z;
       snap.cam.xz = medium.xz;
       snap.cam.zy = medium.zy;
+      captureXt(snap);
+    };
+
+    // xtGraphics' phase machine mutates from inside its DRAW method: denter
+    // both paints the current screen and decides the next one, and a phase's
+    // setup block (fase -2 places the five selectable craft and sets the
+    // camera) runs there too. On an interpolated pass that is a disaster in
+    // slow motion: the setup runs, restoreCurr rolls the object and camera
+    // changes back, and `fase` — which is not an object or a camera — keeps
+    // its new value, so the setup never runs again. The ship-select screen
+    // then draws with a stale camera and five craft still stacked at the
+    // position aces.txt gave them.
+    //
+    // Rather than chase every `this.fase = ...` with a guard, an interpolated
+    // pass is made unable to leave ANY scalar change behind. The five
+    // 180,000-int pixel buffers are deliberately excluded: they are rewritten
+    // wholesale by the effect that uses them, and copying 3.6MB per frame
+    // would cost more than the feature is worth.
+    const XT_SKIP = new Set(['pix', 'bpix', 'mpix', 'opix', 'ppix', 'm', 'ftm']);
+    const captureXt = (snap) => {
+      if (!snap.xt) snap.xt = {};
+      captureScalars(xtgraphics, snap.xt, XT_SKIP);
+    };
+    const restoreXt = (snap) => {
+      if (snap.xt) restoreScalars(xtgraphics, snap.xt);
     };
 
     const blend = (a, b, t, isAngle) => {
@@ -1385,6 +1421,7 @@ export class F51 {
         o.xz = c.xz; o.xy = c.xy; o.zy = c.zy;
         o.dist = c.dist;
       }
+      restoreXt(snapCurr);
       medium.x = snapCurr.cam.x;
       medium.y = snapCurr.cam.y;
       medium.z = snapCurr.cam.z;
@@ -1819,13 +1856,19 @@ export class F51 {
       if (this.smooth) {
         stopRandom();
         this.rd.mute = false;
-        capture(snapCurr);
       }
 
       this.repaint();
       if (!this.mon) {
         this.playsounds(usercraft, aconto2[ai2[0]], flag2, xtgraphics);
       }
+
+      // snapCurr is "the state at the END of the tick", so it is taken here
+      // and not before playsounds: playsounds mutates xtgraphics (cnty is the
+      // music trigger, set to 353 once the intro track has been started), and
+      // a snapshot taken earlier would have an interpolated pass roll that
+      // back and start the track again on the next tick.
+      if (this.smooth) capture(snapCurr);
       date2 = new Date();
       const l8 = Date.now();
       if (!flag2) {
