@@ -115,9 +115,11 @@
 </style>
 </head>
 <body>
+<div id="loading" style="display: none; position: fixed; top: 40vh; left: 50vh;">Loading...</div>
 <div id="wrap">
   <canvas id="screen" width="500" height="360" tabindex="0"></canvas>
 </div>
+
 
 <!-- Browsers refuse to start audio without a user gesture, and this game
      opens on a music track, so the first click both unlocks the AudioContext
@@ -147,6 +149,7 @@
   </div>
 </div>
 
+
 <div id="error"></div>
 
 <script type="module">
@@ -154,6 +157,7 @@
 
   const canvas = document.getElementById('screen');
   const gesture = document.getElementById('gesture');
+  const loading = document.getElementById('loading');
   const errbox = document.getElementById('error');
 
   function fail(e) {
@@ -182,9 +186,12 @@
     localStorage.setItem('ra1:smooth', optSmooth.checked ? '1' : '0');
     const opts = { scale: optRes.checked ? 2 : 1, smooth: optSmooth.checked };
     gesture.remove();
+    loading.style.display = 'block'
     canvas.focus();
+
     try {
       await boot(canvas, opts);
+      loading.style.display = 'none'
     } catch (e) {
       fail(e);
     }
