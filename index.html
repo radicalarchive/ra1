@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Radical Aces</title>
-<link rel="icon" href="../graphics/icon.png">
+<link rel="icon" href="./graphics/icon.png">
 <style>
   /* The game is a fixed 500x360 offscreen image blitted by F51.paint(). The
      page scales that up with nearest-neighbour so the chunky 2001 look
@@ -125,7 +125,7 @@
 <div id="gesture">
   <div class="panel">
     <div id="brand">
-      <img src="../graphics/icon.png" alt="">
+      <img src="./graphics/icon.png" alt="">
       <div>
         <h1>RADICAL ACES</h1>
         <p class="sub">Omar Waly, 2001 &mdash; ported to the browser</p>
@@ -150,7 +150,7 @@
 <div id="error"></div>
 
 <script type="module">
-  import { boot } from './main.js';
+  import { boot } from './web/main.js';
 
   const canvas = document.getElementById('screen');
   const gesture = document.getElementById('gesture');

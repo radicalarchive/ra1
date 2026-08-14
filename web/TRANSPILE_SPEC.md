@@ -1,4 +1,4 @@
-# TRANSPILE_SPEC.md — rules for transpiling `decompilation/java-src/*.java` to `port/*.js`
+# TRANSPILE_SPEC.md — rules for transpiling `decompilation/java-src/*.java` to `web/*.js`
 
 Read this in full before writing a line.
 
@@ -270,7 +270,7 @@ with `s2.startsWith("sun.")`, which is always false. Port it as written.
 
 ## 4. Graphics calls
 
-The shim is `port/graphics.js`, a **Canvas2D** backend (nfm used WebGL; the
+The shim is `web/graphics.js`, a **Canvas2D** backend (nfm used WebGL; the
 reasoning for the difference is in the banner at the top of the file — do not
 "upgrade" it without reading that).
 
@@ -395,7 +395,7 @@ reading of it.
 
 ```sh
 # unpack (usually already done at $JAR_DIR, else:)
-mkdir -p /tmp/ra1jar && cd /tmp/ra1jar && unzip -oq /home/evan/resources/ra1/ra1.jar
+mkdir -p /tmp/ra1jar && cd /tmp/ra1jar && unzip -oq /home/evan/resources/ra1/java/ra1.jar
 
 # write a probe that drives the real class through reflection
 # (fields are package-private, so setAccessible(true) is required)
@@ -416,9 +416,9 @@ System.out.println(java.util.Arrays.toString((int[]) f.get(m)));
 
 Then drive your JS the same way and compare **exact integers**, not "close".
 
-Write the comparison up as a `node:test` file, `port/<Class>.test.js`, with the
+Write the comparison up as a `node:test` file, `web/<Class>.test.js`, with the
 Java-produced values as literals and a comment saying they came from the probe.
-Save the probe SOURCE under `port/tools/`; probes declare `package tools;`.
+Save the probe SOURCE under `web/tools/`; probes declare `package tools;`.
 
 **Pick inputs that exercise negatives, and magnitudes large enough to overflow
 int32**, because that is where truncation-vs-floor, §2 and §2b show up. Small
@@ -445,9 +445,9 @@ green suite of leaf-helper tests.
 
 ## 7. What to hand back
 
-- `port/<Class>.js`
-- `port/<Class>.test.js`, passing
-- the probe source under `port/tools/`
+- `web/<Class>.js`
+- `web/<Class>.test.js`, passing
+- the probe source under `web/tools/`
 - a note listing: every `+= (int)(` site and its A/B classification; every field
   you touched with its declared Java type; every preserved bug; everything you
   could NOT verify
@@ -459,12 +459,12 @@ you paper over costs days. Do not report "gaps: none".
 
 ## 8. Do not touch
 
-- `port/java.js`, `port/graphics.js`, `port/vfs.js`, `port/audio.js` — shared
+- `web/java.js`, `web/graphics.js`, `web/vfs.js`, `web/audio.js` — shared
   infrastructure. If you think one needs a change, say so in your report
   instead of editing it.
 - any existing `.js` or `.test.js` you were not asked to create
 - `AGENTS.md`, `WORK.md`, `TASKS.md`
-- `graphics/`, `levels/`, `objects/`, `siters/`, `sounds/`, `music/`, `ra1.jar`
+- `graphics/`, `levels/`, `objects/`, `siters/`, `sounds/`, `music/`, `java/ra1.jar`
   — game assets and the reference jar, read-only
 
 ---

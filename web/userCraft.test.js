@@ -1,7 +1,7 @@
 // userCraft.test.js — differential test for the transpiled userCraft class.
 //
 // Every expected value below is the LITERAL output of
-// /home/evan/resources/ra1/port/tools/userCraftProbe.java run against the real
+// /home/evan/resources/ra1/web/tools/userCraftProbe.java run against the real
 // Java class (output recorded in decompilation/logs/userCraft.probe.txt).
 // Nothing here is derived by hand; if a value disagrees with the probe, the
 // code is wrong (TRANSPILE_SPEC §2c).

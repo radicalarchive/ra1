@@ -1,6 +1,6 @@
 // F51.test.js — differential test for the transpiled half of F51.
 //
-// Every expected value is the LITERAL output of port/tools/F51Probe.java run
+// Every expected value is the LITERAL output of web/tools/F51Probe.java run
 // against the real Java class (decompilation/logs/F51.probe.txt). If a value
 // disagrees, the port is wrong, not the test (§2c).
 //

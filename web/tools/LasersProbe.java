@@ -22,7 +22,7 @@ import java.util.List;
  *
  * Compile:
  *   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe \
- *         /home/evan/resources/ra1/port/tools/LasersProbe.java
+ *         /home/evan/resources/ra1/web/tools/LasersProbe.java
  *
  * Run:
  *   java -Djava.awt.headless=true \

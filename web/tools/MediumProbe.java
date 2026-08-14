@@ -8,7 +8,7 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 
 /**
- * Drives the REAL Medium from ra1.jar, for port/Medium.test.js.
+ * Drives the REAL Medium from ra1.jar, for web/Medium.test.js.
  *
  * What matters here is the NINE compound assignments of the shape
  * `this.z += (int)((...) / 1.5)`. The bytecode says Case A (the left-hand side
@@ -22,7 +22,7 @@ import java.nio.file.Files;
  * the collaborator is the game's own object rather than a stub.
  *
  * Run:
- *   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe port/tools/MediumProbe.java
+ *   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe web/tools/MediumProbe.java
  *   java -Djava.awt.headless=true -cp /tmp/ra1port/probe:/tmp/ra1jar tools.MediumProbe
  */
 public class MediumProbe {

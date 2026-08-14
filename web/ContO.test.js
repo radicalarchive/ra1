@@ -3,9 +3,9 @@
 // Expected values come from tools/ContOProbe.java driving the REAL ContO out of
 // ra1.jar; its output is committed verbatim as tools/ContOProbe.expected.txt.
 // Regenerate with:
-//   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe port/tools/ContOProbe.java
+//   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe web/tools/ContOProbe.java
 //   java -Djava.awt.headless=true -cp /tmp/ra1port/probe:/tmp/ra1jar tools.ContOProbe \
-//     > port/tools/ContOProbe.expected.txt
+//     > web/tools/ContOProbe.expected.txt
 //
 // The parser half is the important half. ContO's byte[] constructor loads all
 // of the game's geometry, its loop is wrapped in `catch (Exception ex) {}`, and
@@ -23,7 +23,7 @@ const REPO = new URL('../', import.meta.url).pathname;
 
 // Expected values, keyed by the probe's own labels.
 const expected = new Map();
-for (const line of readFileSync(REPO + 'port/tools/ContOProbe.expected.txt', 'utf8').split('\n')) {
+for (const line of readFileSync(REPO + 'web/tools/ContOProbe.expected.txt', 'utf8').split('\n')) {
   const eq = line.indexOf(' = ');
   if (eq > 0) expected.set(line.slice(0, eq), line.slice(eq + 3));
 }

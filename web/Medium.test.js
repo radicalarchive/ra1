@@ -3,9 +3,9 @@
 // Expected values come from tools/MediumProbe.java driving the REAL Medium out
 // of ra1.jar; its output is committed as tools/MediumProbe.expected.txt.
 // Regenerate with:
-//   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe port/tools/MediumProbe.java
+//   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe web/tools/MediumProbe.java
 //   java -Djava.awt.headless=true -cp /tmp/ra1port/probe:/tmp/ra1jar tools.MediumProbe \
-//     > port/tools/MediumProbe.expected.txt
+//     > web/tools/MediumProbe.expected.txt
 //
 // Each view mode is driven for EIGHT steps from a negative starting position.
 // That is deliberate: Medium's nine `+= (int)(expr / 1.5)` sites are §2 Case A
@@ -22,7 +22,7 @@ import { ContO } from './ContO.js';
 const REPO = new URL('../', import.meta.url).pathname;
 
 const expected = new Map();
-for (const line of readFileSync(REPO + 'port/tools/MediumProbe.expected.txt', 'utf8').split('\n')) {
+for (const line of readFileSync(REPO + 'web/tools/MediumProbe.expected.txt', 'utf8').split('\n')) {
   const eq = line.indexOf(' = ');
   if (eq > 0) expected.set(line.slice(0, eq), line.slice(eq + 3));
 }

@@ -3,8 +3,8 @@
 # agy_ra1 — run ONE bounded transpilation step via `agy -p`.
 #
 # Usage:   bash decompilation/agy_ra1 class <Class>    the whole loop, in one job
-#          bash decompilation/agy_ra1 port  <Class>    write port/<Class>.js + the probe
-#          bash decompilation/agy_ra1 test  <Class>    write port/<Class>.test.js from probe output
+#          bash decompilation/agy_ra1 port  <Class>    write web/<Class>.js + the probe
+#          bash decompilation/agy_ra1 test  <Class>    write web/<Class>.test.js from probe output
 #          bash decompilation/agy_ra1 fix   <Class>    fix the code against a failing test log
 #
 # (Invoke with `bash`: chmod is not available in this session, so the file is
@@ -42,7 +42,7 @@ TIMEOUT="${TIMEOUT:-45m}"
 REPO="/home/evan/resources/ra1"
 NFM="/home/evan/resources/nfm"
 SRC_DIR="$REPO/decompilation/java-src"
-OUT_DIR="$REPO/port"
+OUT_DIR="$REPO/web"
 LOGS="$REPO/decompilation/logs"
 JAR_DIR="/tmp/ra1jar"
 

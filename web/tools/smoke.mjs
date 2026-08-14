@@ -1,7 +1,7 @@
 // smoke.mjs — boot the port in a real Chromium and report what happened.
 //
 //   python3 -m http.server 8123          # from the repo root
-//   node port/tools/smoke.mjs [seconds] [out.png]
+//   node web/tools/smoke.mjs [seconds] [out.png]
 //
 // Why not `chromium --headless --screenshot`: that mode drives the page with
 // VIRTUAL time, and virtual time does not advance across createImageBitmap or
@@ -21,7 +21,7 @@ import { join } from 'node:path';
 
 const SECONDS = Number(process.argv[2] || 12);
 const OUT = process.argv[3] || join(tmpdir(), 'ra1-smoke.png');
-const URL_ = process.env.SMOKE_URL || 'http://localhost:8123/port/tools/boot-smoke.html';
+const URL_ = process.env.SMOKE_URL || 'http://localhost:8123/web/tools/boot-smoke.html';
 const PORT = 9333;
 
 const profile = mkdtempSync(join(tmpdir(), 'ra1-chrome-'));
@@ -102,7 +102,9 @@ await sleep(1500);
 // main.html gates the boot behind a click (WebAudio needs a gesture); the
 // smoke harness page boots straight away. Click the overlay if it is there.
 await send('Runtime.evaluate', {
-  expression: `document.getElementById('gesture')?.click()`,
+  // index.html gates the boot behind the launcher's play button; the harness
+  // page (boot-smoke.html) boots on load and has neither.
+  expression: `(document.getElementById('play') || document.getElementById('gesture'))?.click()`,
 });
 await sleep(SECONDS * 1000);
 

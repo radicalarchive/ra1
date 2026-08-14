@@ -3,14 +3,14 @@
 <head><meta charset="utf-8"><title>graphics.js smoke</title></head>
 <body style="margin:0;background:#222">
 <!--
-  A browser smoke test for port/graphics.js: the Canvas2D Graphics shim, the
+  A browser smoke test for web/graphics.js: the Canvas2D Graphics shim, the
   offscreen-image plumbing (createImage / grabPixels / imageFromPixels) and the
   even-odd fill rule. node cannot run these — there is no canvas — so this page
   is the harness, driven headlessly:
 
     chromium --headless=new --no-sandbox --screenshot=/tmp/ra1port/smoke.png \
       --window-size=520,760 --virtual-time-budget=8000 \
-      http://localhost:8123/port/tools/graphics-smoke.html
+      http://localhost:8123/web/tools/graphics-smoke.html
 
   It prints PASS/FAIL lines to the console (read them with
   --enable-logging=stderr --vmodule=console=1) and draws the same shapes on

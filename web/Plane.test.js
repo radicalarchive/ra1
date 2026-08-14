@@ -1,7 +1,7 @@
 // Plane.test.js — differential test for the transpiled Plane class.
 //
 // Every expected value below is the LITERAL output of
-// /home/evan/resources/ra1/port/tools/PlaneProbe.java run against the real
+// /home/evan/resources/ra1/web/tools/PlaneProbe.java run against the real
 // Java class (output recorded in decompilation/logs/Plane.probe.txt).
 // Nothing here is derived by hand; if a value disagrees with the probe, the
 // code is wrong (TRANSPILE_SPEC §2c).

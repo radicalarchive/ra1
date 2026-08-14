@@ -1,7 +1,7 @@
 // Lasers.test.js — differential test for the transpiled Lasers class.
 //
 // Every expected value below is the LITERAL output of
-// /home/evan/resources/ra1/port/tools/LasersProbe.java run against the real
+// /home/evan/resources/ra1/web/tools/LasersProbe.java run against the real
 // Java class (output recorded in decompilation/logs/Lasers.probe.txt).
 // Nothing here is derived by hand; if a value disagrees with the probe, the
 // code is wrong (TRANSPILE_SPEC §2c).
@@ -319,7 +319,7 @@ test('d() draws deterministic laser types 0, 1, 4, 5, 6, 7, 8, 10 without error'
 // bytecode alone, which is unambiguous:
 //   70: iaload ; 75: i2d ; ... ; 98: dadd ; 99: dadd ; 100: d2i ; 101: iastore
 // The accumulator is widened with i2d before the arithmetic and truncated once
-// at the end — Case A. `port/Lasers.js` implements
+// at the end — Case A. `web/Lasers.js` implements
 //   ai[n4] = trunc(ai[n4] + (i - this.m.x + (random() * 50.0 - 25.0)))
 //
 // (A test asserting `Math.trunc(10 - 0.4) !== 10 + Math.trunc(-0.4)` stood here

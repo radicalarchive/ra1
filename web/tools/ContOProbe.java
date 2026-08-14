@@ -8,7 +8,7 @@ import java.nio.file.Files;
 import java.util.Arrays;
 
 /**
- * Drives the REAL ContO from ra1.jar and prints its state, for port/ContO.test.js.
+ * Drives the REAL ContO from ra1.jar and prints its state, for web/ContO.test.js.
  *
  * Two things are probed, and the first is the interesting one:
  *
@@ -25,7 +25,7 @@ import java.util.Arrays;
  *    int32 — those are the ones TRANSPILE_SPEC §2b is about.
  *
  * Run:
- *   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe port/tools/ContOProbe.java
+ *   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe web/tools/ContOProbe.java
  *   java -Djava.awt.headless=true -cp /tmp/ra1port/probe:/tmp/ra1jar tools.ContOProbe
  */
 public class ContOProbe {

@@ -14,7 +14,7 @@ import java.util.Arrays;
  * Reflection probe for xtGraphics.java against the real ra1.jar classes.
  *
  * Compile:
- *   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe /home/evan/resources/ra1/port/tools/xtGraphicsProbe.java
+ *   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe /home/evan/resources/ra1/web/tools/xtGraphicsProbe.java
  * Run:
  *   java -Djava.awt.headless=true -cp /tmp/ra1port/probe:/tmp/ra1jar tools.xtGraphicsProbe
  */

@@ -7,7 +7,7 @@ This is the **second** port of this engine. The first was *Need for Madness*
 at `/home/evan/resources/nfm`, and it is finished and playable. Everything here
 that is not specific to Radical Aces was inherited from it, including the
 mistakes it made — read `/home/evan/resources/nfm/WORK.md` before you decide
-that a rule in `port/TRANSPILE_SPEC.md` is over-cautious.
+that a rule in `web/TRANSPILE_SPEC.md` is over-cautious.
 
 ---
 
@@ -103,7 +103,7 @@ AWT key codes, remappable through `KeySettings.txt` (documented in
 Java 6, no generics beyond `Set<Integer>`, no lambdas — mechanically
 translatable. **Do not restructure.** The value of this approach is that the 3D
 math and physics carry over verbatim and stay diff-testable against the running
-Java. The contract is `port/TRANSPILE_SPEC.md`; read it in full.
+Java. The contract is `web/TRANSPILE_SPEC.md`; read it in full.
 
 ### 2. Reimplement `Graphics`, do not rewrite the renderer
 
@@ -133,7 +133,7 @@ scene. Radical Aces is different in two ways that both point back to Canvas2D:
   build a new image from the result. Under Canvas2D that is a `getImageData`;
   under WebGL it is a `readPixels` stall on every menu frame.
 
-So `port/graphics.js` is Canvas2D. If the *race* turns out to be fill-bound,
+So `web/graphics.js` is Canvas2D. If the *race* turns out to be fill-bound,
 the answer is a WebGL backend behind the same eleven methods, with colour as a
 vertex attribute and one ordered buffer per frame — nfm's `web/graphics.js` is
 the worked example. Measure before switching, and read nfm's AGENTS.md
@@ -186,7 +186,7 @@ Physics bugs are transpilation bugs, and transpilation bugs have an oracle: the
 running Java. For every class, a Java reflection probe drives the **real class
 from the jar**, prints its state, and those literals become the expected values
 in a `node:test` file. This is not optional and it is not approximate — see
-`port/TRANSPILE_SPEC.md` §6.
+`web/TRANSPILE_SPEC.md` §6.
 
 ### Numeric hazards — the actual risk in Java→JS
 
@@ -197,7 +197,7 @@ passes through them, so float32 rounding must happen at **each** binary
 operation or the port drifts gradually rather than failing loudly.
 
 The full rules, with worked examples of the two bugs that survived "looking
-right" in the sibling port, are in `port/TRANSPILE_SPEC.md` §1, §2, §2b.
+right" in the sibling port, are in `web/TRANSPILE_SPEC.md` §1, §2, §2b.
 
 ---
 

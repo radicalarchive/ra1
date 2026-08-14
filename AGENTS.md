@@ -6,7 +6,7 @@ The original source was never released; `decompilation/java-src/` is
 procyon-decompiled bytecode and is the reference for the port, not a build
 input. `ra1.jar` still runs and is the oracle you compare against.
 
-**The port under `port/` is the active work.**
+**The port under `web/` is the active work.**
 
 This is the second port of this engine. The first — *Need for Madness*, at
 `/home/evan/resources/nfm` — is finished, playable, and shares `ContO`,
@@ -16,7 +16,7 @@ solving a problem it already solved.
 ## Read these first
 - `decompilation/PORT_SPEC.md` — the plan, the measured facts, and the
   subagent delegation methodology. Binding.
-- `port/TRANSPILE_SPEC.md` — the contract for turning decompiled Java into JS
+- `web/TRANSPILE_SPEC.md` — the contract for turning decompiled Java into JS
   (int wrapping, float32 rounding, compound-assignment classification).
 - `WORK.md` — the running log. See below.
 - `TASKS.md` — what is done, what is next, what is blocked.
@@ -31,18 +31,24 @@ rediscovering. Append as you go, not at the end of the session. When a
 measurement overturns an entry, ~~strike it through~~; don't delete it.
 
 ## Layout
-- `port/` — the JS port. `java.js`, `graphics.js`, `vfs.js`, `audio.js` are the
+Mirrors the sibling nfm port: the playable game at the root, everything about
+decompiling it in one subdirectory.
+- `index.html` — the launcher, and the page you open. `win.html` is the page
+  the game navigates to after the final mission (it was `winner/index.html` in
+  the original distribution; the two images it uses are in `graphics/`).
+- `web/` — the JS port. `java.js`, `graphics.js`, `vfs.js`, `audio.js` are the
   hand-written seams; every other `.js` is a transpiled class with a
   probe-verified `.test.js` beside it.
-- `port/tools/` — Java reflection probes that drive the real classes from the
+- `web/tools/` — Java reflection probes that drive the real classes from the
   jar. These are the oracle.
 - `decompilation/java-src/` — decompiled originals. Read-only reference.
 - `decompilation/agy_ra1` — runs one delegated transpilation job.
 - `decompilation/logs/` — job logs, probe output, failure logs.
-- `graphics/ levels/ objects/ siters/ sounds/ music/ web/ winner/` — game
+- `graphics/ levels/ objects/ siters/ sounds/ music/` — game
   assets from the original distribution, byte-identical and **not to be
   modified**; the port reads them as-is.
-- `ra1.jar`, `ra1.exe` — the original build. Read-only.
+- `java/` — the original build: `ra1.jar`, `ra1.exe`, the launch4j config,
+  and `applet/`, the web wrapper the 2003 distribution shipped. Read-only.
 - `cookies/` — save data, gitignored. The port keeps saves in localStorage.
 
 ## The original GUI is part of the port
@@ -50,13 +56,16 @@ Unlike the nfm port, which replaced the game's menu with an HTML launcher, this
 port **keeps the game's own menus**. They are not AWT widgets: `xtGraphics`
 draws them into the same 500×360 offscreen image as the race, with the same
 eleven `Graphics` calls. Keeping them is less work than replacing them, and it
-is what the user asked for. Do not introduce an HTML launcher.
+is what the user asked for. **Do not move any part of the game's UI into HTML.**
+`index.html` is a title card, not a menu: it exists because a browser needs a
+user gesture before audio, and it carries the two options that have no
+equivalent in the original (2× resolution, smooth motion). Everything else —
+ship select, the mission briefing, the HUD — is drawn by `xtGraphics`.
 
 ## Running the port
 ```sh
-python3 -m http.server 8123          # from the repo root
-# then open http://localhost:8123/port/main.html   (click to start — WebAudio
-#                                                   needs a user gesture)
+sh serve.sh                          # python3 -m http.server, from the repo root
+# then open http://localhost:8123/   (click Play — WebAudio needs a gesture)
 ```
 The game reads its assets by relative path from the repo root, exactly as the
 desktop build does; `F51.init` resolves them against `import.meta.url`, so a
@@ -64,10 +73,10 @@ harness page at any depth loads the same files.
 
 To check it headlessly:
 ```sh
-node port/tools/smoke.mjs 12 /tmp/shot.png    # console, page errors, canvas
+node web/tools/smoke.mjs 12 /tmp/shot.png    # console, page errors, canvas
                                               # coverage, game-loop rate, and
                                               # screenshots before/after a click
-SMOKE_KEYS=10,10 node port/tools/smoke.mjs    # send AWT key codes too
+SMOKE_KEYS=10,10 node web/tools/smoke.mjs    # send AWT key codes too
 ```
 **Do not smoke-test with `chromium --headless --screenshot`.** That mode uses
 virtual time, which does not advance across `createImageBitmap` or
@@ -76,21 +85,21 @@ virtual time, which does not advance across `createImageBitmap` or
 
 ## Verifying a change
 ```sh
-cd port && node --test               # unit + differential tests
+cd web && node --test               # unit + differential tests
 ```
 Every transpiled class has a `.test.js` whose expected values were printed by
 its Java probe. If one fails, the port is wrong — not the test (§2c).
 
 To re-run a probe:
 ```sh
-mkdir -p /tmp/ra1jar && cd /tmp/ra1jar && unzip -oq /home/evan/resources/ra1/ra1.jar
-javac -cp /tmp/ra1jar -d /tmp/ra1port/probe port/tools/<Class>Probe.java
+mkdir -p /tmp/ra1jar && cd /tmp/ra1jar && unzip -oq /home/evan/resources/ra1/java/ra1.jar
+javac -cp /tmp/ra1jar -d /tmp/ra1port/probe web/tools/<Class>Probe.java
 java -Djava.awt.headless=true -cp /tmp/ra1port/probe:/tmp/ra1jar tools.<Class>Probe
 ```
 
 ## The reference implementation
 ```sh
-java -jar ra1.jar                    # needs a display; reads assets from cwd
+sh start.sh                          # or: java -jar java/ra1.jar                    # needs a display; reads assets from cwd
 ```
 JDK 17 runs it: the jar vendors its own copy of `sun.audio`, which Java 9
 removed, so no patching was needed. That is a real difference from nfm, whose
@@ -133,4 +142,4 @@ There is **no depth buffer**. Occlusion is submission order and nothing else:
 `F51.run()` depth-sorts the `ContO`s, `Plane.d()` sorts faces within an object.
 Do not batch, reorder, or hoist a draw call. Any of those still looks plausible
 in a screenshot, which is what makes it dangerous. See the banner at the top of
-`port/graphics.js`.
+`web/graphics.js`.

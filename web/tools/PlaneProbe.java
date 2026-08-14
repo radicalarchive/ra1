@@ -12,7 +12,7 @@ import java.util.Arrays;
  *
  * Compile:
  *   javac -cp /tmp/ra1jar -d /tmp/ra1port/probe \
- *         /home/evan/resources/ra1/port/tools/PlaneProbe.java
+ *         /home/evan/resources/ra1/web/tools/PlaneProbe.java
  *
  * Run:
  *   java -Djava.awt.headless=true \

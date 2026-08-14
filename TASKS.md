@@ -9,16 +9,16 @@ supersedes the status (not the methodology) in `decompilation/PORT_SPEC.md`.
   to `decompilation/java-src/`. 13 of 14 recompile clean; the one artifact is
   `F51$1.java`, the anonymous window-close handler.
 - **Specs.** `decompilation/PORT_SPEC.md` (plan, measured facts, delegation),
-  `port/TRANSPILE_SPEC.md` (the Java→JS contract), `AGENTS.md`, `WORK.md`.
+  `web/TRANSPILE_SPEC.md` (the Java→JS contract), `AGENTS.md`, `WORK.md`.
 - **Delegation pipeline.** `decompilation/agy_ra1`, three phases
   (`port` / `test` / `fix`), validated end to end on `SinCos`.
 - **Seams, hand-written, not delegated:**
-  - `port/java.js` — int/float32 semantics, seeded PRNG, packed-colour helpers.
-  - `port/graphics.js` — the eleven-method `Graphics` surface on Canvas2D, plus
+  - `web/java.js` — int/float32 semantics, seeded PRNG, packed-colour helpers.
+  - `web/graphics.js` — the eleven-method `Graphics` surface on Canvas2D, plus
     `createImage` / `PixelGrabber` / `MemoryImageSource`.
-  - `port/vfs.js` — preloading VFS, Latin-1 `readLine`, zip reader for
+  - `web/vfs.js` — preloading VFS, Latin-1 `readLine`, zip reader for
     `models.zrad`, `cookies/` on localStorage.
-  - `port/audio.js` — `javax.sound.sampled.Clip` on WebAudio.
+  - `web/audio.js` — `javax.sound.sampled.Clip` on WebAudio.
 - **`SinCos`** — transpiled, probe-verified, 12 tests green.
 - **`Control`, `cControl`** — transpiled by hand (pure field holders, nothing
   to probe).
@@ -64,13 +64,13 @@ supersedes the status (not the methodology) in `decompilation/PORT_SPEC.md`.
   delegated. The delegated pacer computed the frame delay and discarded it;
   fixed by hand, and measured at 25.8 game iterations/sec in the menus against
   Java's target.
-- **`port/main.js`** — the boot: DOM keys through `input.js` into the AWT 1.0
+- **`web/main.js`** — the boot: DOM keys through `input.js` into the AWT 1.0
   handlers, `blur` into `lostFocus`, canvas clicks into `mouseDown`.
 - **The game runs.** It loads, plays the intro, renders the title scene with the
   real 3D models, and responds to keyboard and mouse in Chromium.
 
 129 tests green in total; `graphics.js` also passes a headless-Chromium smoke
-test (`port/tools/graphics-smoke.html`).
+test (`web/tools/graphics-smoke.html`).
 
 ## Blocked
 
@@ -84,7 +84,7 @@ Nothing. The `agy` quota reset, and delegation now runs on
   subagent, which is worth knowing if its style differs from its neighbours.
 
 ## Options
-Both are on the launcher (`port/main.html`), remembered in localStorage, and
+Both are on the launcher (`index.html`), remembered in localStorage, and
 settable as `?res=2&smooth=1`:
 - **2× resolution** — `Graphics2D` scales the context, so the game's 500×360
   coordinates are untouched and only the rasterisation is finer. The fullscreen
@@ -97,9 +97,9 @@ settable as `?res=2&smooth=1`:
 
 1. **Play it against the jar.** Everything so far is verified per-class or by a
    headless smoke run; nobody has yet flown a mission in the port and compared
-   it with `java -jar ra1.jar` side by side. Start a level, check the physics,
+   it with `sh start.sh                          # or: java -jar java/ra1.jar` side by side. Start a level, check the physics,
    the HUD, the radar, the lasers and the save/continue flow.
-   `node port/tools/smoke.mjs [seconds] [out.png]` drives it headlessly
+   `node web/tools/smoke.mjs [seconds] [out.png]` drives it headlessly
    (`SMOKE_KEYS`, `SMOKE_CLICK_WAIT`), but the real check needs a human.
 2. **In-race pacing.** The menus measure 25.8 iterations/sec against Java's
    ~25; the in-race target is ~18/sec and is NOT yet measured, and it is the

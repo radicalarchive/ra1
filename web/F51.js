@@ -38,7 +38,7 @@ import { Tank } from './Tank.js';
 import { userCraft } from './userCraft.js';
 
 // Every asset path in the game is relative to the repo root; the port lives in
-// port/. Resolve against this module, not against whatever page loaded it.
+// web/. Resolve against this module, not against whatever page loaded it.
 const REPO = new URL('../', import.meta.url).href;
 
 export class F51 {
@@ -110,7 +110,7 @@ export class F51 {
     this.frags = 0;
     this.dnload = 0;
 
-    // Diagnostics for port/tools/smoke.mjs. `_ticks` counts SIMULATION steps
+    // Diagnostics for web/tools/smoke.mjs. `_ticks` counts SIMULATION steps
     // (the game's speed) and `_draws` counts frames put on screen; with smooth
     // motion on they differ, and confusing the two makes a working feature look
     // like a 3x speedup.
@@ -806,10 +806,10 @@ export class F51 {
     // 4. FILES: preload VFS assets and base models zip before loaders run.
     //
     // The game's paths are relative to the REPO ROOT ("siters/base.txt"), and
-    // the port lives one directory down in port/. Resolving that against
+    // the port lives one directory down in web/. Resolving that against
     // import.meta.url rather than against the page means a harness page at any
-    // depth — port/main.html, port/tools/boot-smoke.html — resolves the same
-    // assets; a bare '../' silently 404s from anywhere but port/.
+    // depth — index.html, web/tools/boot-smoke.html — resolves the same
+    // assets; a bare '../' silently 404s from anywhere but web/.
     vfs.setFpath(REPO);
     await vfs.preload(assets.VFS_FILES);
     await vfs.preloadZip(assets.MODELS_ZIP);
@@ -924,7 +924,13 @@ export class F51 {
    */
   open(url) {
     if (typeof window !== 'undefined') {
-      window.location.href = new URL(url, REPO).href;
+      // The transpiled call site still says "winner/index.html", which is
+      // where the file lived in the original distribution. The directory held
+      // one page and two images; the page is win.html at the root now and the
+      // images are in graphics/, so the seam maps the old path rather than
+      // editing the game code (§0).
+      const path = url === 'winner/index.html' ? 'win.html' : url;
+      window.location.href = new URL(path, REPO).href;
     }
   }
 
@@ -1227,7 +1233,7 @@ export class F51 {
     // Thread priority (this.gamer.setPriority(10)) has no browser JS equivalent.
     const medium = new Medium();
     const xtgraphics = new xtGraphics(medium, this.rd);
-    // Diagnostics handles for port/tools/smoke.mjs: xtgraphics and the object
+    // Diagnostics handles for web/tools/smoke.mjs: xtgraphics and the object
     // array are locals of run(), and they are what a smoke run has to read to
     // check per-frame counters or what is actually on screen.
     this._xt = xtgraphics;
@@ -1948,7 +1954,7 @@ export class F51 {
       do {
         await new Promise((r) => raf(r));
         if (!this.gamer) break;
-        // `_forceInterp` (a test seam, set by port/tools/smoke.mjs) runs a
+        // `_forceInterp` (a test seam, set by web/tools/smoke.mjs) runs a
         // fixed number of interpolated passes per tick instead of however many
         // the display happens to allow. It is how the guards are checked: with
         // every draw-time mutation properly guarded, N extra passes must leave
