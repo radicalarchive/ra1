@@ -653,16 +653,18 @@ export class xtGraphics {
       }
       g.drawImage(this.rad, 93, 32);
       if (this.fase === 5) {
-        this.drawcs(g, 84, 'Wild Polygons 3D engine by:', 0, 0, 0, false);
-        this.drawcs(g, 96, 'Omar Waly', 100, 100, 100, false);
-        this.drawcs(g, 114, '3D models by:', 0, 0, 0, false);
-        this.drawcs(g, 126, 'Omar Waly', 100, 100, 100, false);
-        this.drawcs(g, 144, 'Game programming by:', 0, 0, 0, false);
-        this.drawcs(g, 156, 'Omar Waly', 100, 100, 100, false);
-        this.drawcs(g, 174, 'Graphics by:', 0, 0, 0, false);
-        this.drawcs(g, 186, 'Omar Waly', 100, 100, 100, false);
-        this.drawcs(g, 204, 'This version of the game was updated and is maintained by:', 0, 0, 0, false);
-        this.drawcs(g, 216, 'Jaroslav Paska (Phyrexian)', 100, 100, 100, false);
+        this.drawcs(g, 74, 'Wild Polygons 3D engine by:', 0, 0, 0, false);
+        this.drawcs(g, 86, 'Omar Waly', 100, 100, 100, false);
+        this.drawcs(g, 104, '3D models by:', 0, 0, 0, false);
+        this.drawcs(g, 116, 'Omar Waly', 100, 100, 100, false);
+        this.drawcs(g, 134, 'Game programming by:', 0, 0, 0, false);
+        this.drawcs(g, 146, 'Omar Waly', 100, 100, 100, false);
+        this.drawcs(g, 164, 'Graphics by:', 0, 0, 0, false);
+        this.drawcs(g, 176, 'Omar Waly', 100, 100, 100, false);
+        this.drawcs(g, 190, 'This version of the game was updated and is maintained by:', 0, 0, 0, false);
+        this.drawcs(g, 202, 'Jaroslav Paska (Phyrexian)', 100, 100, 100, false);
+        this.drawcs(g, 220, 'Web port:', 100, 100, 100, false);
+        this.drawcs(g, 232, 'Evidlo', 0, 0, 0, false);
       }
       if (this.fase === 6) {
         this.drawcs(g, 80, 'Music was obtained from FlashKit.com', 0, 0, 0, false);
