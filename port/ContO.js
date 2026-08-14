@@ -177,17 +177,25 @@ export class ContO {
       this.dist = 0;
     }
     let i = 0;
-    for (let j = 0; j < this.npl; ++j) {
-      if (!this.exp) {
-        if (this.p[j].exp !== 0) {
-          this.p[j].exp = 0;
+    if (!this.m.interpolating) {
+      for (let j = 0; j < this.npl; ++j) {
+        if (!this.exp) {
+          if (this.p[j].exp !== 0) {
+            this.p[j].exp = 0;
+          }
+        }
+        else if (this.p[j].exp === 0) {
+          this.p[j].exp = 1;
+        }
+        else if (this.p[j].exp === 7) {
+          ++i;
         }
       }
-      else if (this.p[j].exp === 0) {
-        this.p[j].exp = 1;
-      }
-      else if (this.p[j].exp === 7) {
-        ++i;
+    } else {
+      for (let j = 0; j < this.npl; ++j) {
+        if (this.p[j].exp === 7) {
+          ++i;
+        }
       }
     }
     if (!this.out && i !== this.npl) {
@@ -222,7 +230,7 @@ export class ContO {
         const k2 = i32(this.m.cy + trunc(fr(fr((this.y - this.m.y - this.m.cy) * this.m.cs.getcos(this.m.zy))
                                          - fr((l - this.m.cz) * this.m.cs.getsin(this.m.zy)))));
         if ((this.ys(i32(k2 + this.maxR), i2) > 0 && this.ys(i32(k2 - this.maxR), i2) < this.m.h) || this.exp) {
-          if (this.m.jumping !== 0 && this.m.jumping < 4) {
+          if (this.m.jumping !== 0 && this.m.jumping < 4 && !this.m.interpolating) {
             this.hit = true;
           }
           // §5b: Java int[] ai — use intArray
@@ -267,7 +275,7 @@ export class ContO {
         }
       }
     }
-    if (this.hit) {
+    if (this.hit && !this.m.interpolating) {
       this.hit = false;
       if (this.m.jumping === 0 && this.nhits > this.maxhits) {
         this.exp = true;

@@ -59,6 +59,7 @@ export class Medium {
     this.vxz = 0;
     this.adv = -500;
     this.vert = false;
+    this.interpolating = false;
   }
 
   ys(i, j) {
@@ -199,7 +200,7 @@ export class Medium {
       }
       g.fillPolygon(ai, ai2, 4);
     }
-    if (this.jumping !== 0) {
+    if (this.jumping !== 0 && !this.interpolating) {
       --this.jumping;
     }
   }

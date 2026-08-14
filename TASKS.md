@@ -83,6 +83,16 @@ Nothing. The `agy` quota reset, and delegation now runs on
   mutation-checked, but it is the one class that did not go through the
   subagent, which is worth knowing if its style differs from its neighbours.
 
+## Options
+Both are on the launcher (`port/main.html`), remembered in localStorage, and
+settable as `?res=2&smooth=1`:
+- **2× resolution** — `Graphics2D` scales the context, so the game's 500×360
+  coordinates are untouched and only the rasterisation is finer. The fullscreen
+  pixel effects stay 500×360 by construction and are upscaled.
+- **Smooth motion** — interpolated frames between physics ticks. The tick rate,
+  and so the game's speed, is unchanged: measured 25.5 ticks/sec with it off
+  and 26.0 with it on, while drawn frames rise to the display's rate.
+
 ## Next, in dependency order
 
 1. **Play it against the jar.** Everything so far is verified per-class or by a
@@ -94,7 +104,13 @@ Nothing. The `agy` quota reset, and delegation now runs on
 2. **In-race pacing.** The menus measure 25.8 iterations/sec against Java's
    ~25; the in-race target is ~18/sec and is NOT yet measured, and it is the
    one that governs how the aircraft flies.
-3. **Audio.** Preloaded and wired, but never heard: the smoke runs are muted
+3. **Smooth motion in a race, judged by eye.** The guards are verified by
+   forcing the interpolation rate and checking the per-tick state advance holds
+   (`SMOKE_FORCE_INTERP=4`), and the menus look right, but nobody has watched an
+   aircraft fly with it on. Watch for: an object that stutters while the rest
+   glides (a missing blend field), an effect animating too fast (a missing
+   guard), or a shimmer on flames and sparks (a draw-time random not replayed).
+4. **Audio.** Preloaded and wired, but never heard: the smoke runs are muted
    and headless. Check the music cycles and that `playsounds`' counters are not
    retriggering clips every frame.
 

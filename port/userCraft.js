@@ -569,7 +569,7 @@ export class userCraft {
   dosmokes(g, conto) {
     if (!conto.exp) {
       if (conto.nhits > conto.maxhits - idiv(conto.maxhits, 3)) {
-        if (this.dms[this.nd] === -1) {
+        if (this.dms[this.nd] === -1 && !this.lsr.m.interpolating) {
           this.dx[this.nd] = conto.x + trunc(random() * 60.0 - 30.0);
           this.dy[this.nd] = conto.y;
           this.dz[this.nd] = conto.z;
@@ -587,20 +587,22 @@ export class userCraft {
             if (this.dms[i] < 4) {
               this.lsr.hsmoke(g, this.dx[i], this.dy[i], this.dz[i], this.dxz[i], this.dzy[i], this.dms[i]);
             }
-            const dy = this.dy;
-            const n = i;
-            dy[n] -= 15;
-            const dms = this.dms;
-            const n2 = i;
-            ++dms[n2];
-            if (this.dms[i] < 7) {
-              continue;
+            if (!this.lsr.m.interpolating) {
+              const dy = this.dy;
+              const n = i;
+              dy[n] -= 15;
+              const dms = this.dms;
+              const n2 = i;
+              ++dms[n2];
+              if (this.dms[i] < 7) {
+                continue;
+              }
+              this.dms[i] = -1;
             }
-            this.dms[i] = -1;
           }
         } while (++i < 4);
       }
-      if (this.smoke && conto.y > 200 && this.sms[this.ns] === -1) {
+      if (this.smoke && conto.y > 200 && this.sms[this.ns] === -1 && !this.lsr.m.interpolating) {
         this.sx[this.ns] = conto.x + trunc(random() * 80.0 - 40.0);
         this.sy[this.ns] = conto.y + 15;
         this.sz[this.ns] = conto.z;
@@ -619,16 +621,18 @@ export class userCraft {
           if (this.sms[j] < 4) {
             this.lsr.gsmoke(g, this.sx[j], this.sy[j], this.sz[j], this.sxz[j], this.szy[j], this.sms[j]);
           }
-          const sy = this.sy;
-          const n3 = j;
-          sy[n3] -= 15;
-          const sms = this.sms;
-          const n4 = j;
-          ++sms[n4];
-          if (this.sms[j] !== 10) {
-            continue;
+          if (!this.lsr.m.interpolating) {
+            const sy = this.sy;
+            const n3 = j;
+            sy[n3] -= 15;
+            const sms = this.sms;
+            const n4 = j;
+            ++sms[n4];
+            if (this.sms[j] !== 10) {
+              continue;
+            }
+            this.sms[j] = -1;
           }
-          this.sms[j] = -1;
         }
       } while (++j < 4);
     }
@@ -706,13 +710,15 @@ export class userCraft {
         if (this.lhit[i] === 0) {
           continue;
         }
-        const lhit = this.lhit;
-        const n = i;
-        ++lhit[n];
-        if (this.lhit[i] <= 2) {
-          continue;
+        if (!this.lsr.m.interpolating) {
+          const lhit = this.lhit;
+          const n = i;
+          ++lhit[n];
+          if (this.lhit[i] <= 2) {
+            continue;
+          }
+          this.lstage[i] = 0;
         }
-        this.lstage[i] = 0;
       }
     } while (++i < 20);
   }

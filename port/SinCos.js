@@ -42,7 +42,11 @@ export class SinCos {
     while (i < 0) {
       i += 360;
     }
-    return this.tsin[i];
+    const i0 = i | 0;
+    if (i0 === i) return this.tsin[i0];
+    const a = this.tsin[i0];
+    const b = this.tsin[i0 + 1 === 360 ? 0 : i0 + 1];
+    return fr(a + (b - a) * (i - i0));
   }
 
   getcos(i) {
@@ -52,6 +56,10 @@ export class SinCos {
     while (i < 0) {
       i += 360;
     }
-    return this.tcos[i];
+    const i0 = i | 0;
+    if (i0 === i) return this.tcos[i0];
+    const a = this.tcos[i0];
+    const b = this.tcos[i0 + 1 === 360 ? 0 : i0 + 1];
+    return fr(a + (b - a) * (i - i0));
   }
 }

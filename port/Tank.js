@@ -436,7 +436,7 @@ export class Tank {
 
   dosmokes(g, conto) {
     if (conto.y > 200) {
-      if (this.smoke && !conto.exp && this.sms[this.ns] === -1) {
+      if (this.smoke && !conto.exp && this.sms[this.ns] === -1 && !this.lsr.m.interpolating) {
         this.sx[this.ns] = conto.x + trunc(random() * 150.0 - 75.0);
         this.sy[this.ns] = conto.y + 10;
         this.sz[this.ns] = conto.z;
@@ -454,16 +454,18 @@ export class Tank {
           if (this.sms[i] < 5) {
             this.lsr.gsmoke(g, this.sx[i], this.sy[i], this.sz[i], this.sxz[i], 0, this.sms[i]);
           }
-          const sy = this.sy;
-          const n = i;
-          sy[n] -= 10;
-          const sms = this.sms;
-          const n2 = i;
-          ++sms[n2];
-          if (this.sms[i] !== 10) {
-            continue;
+          if (!this.lsr.m.interpolating) {
+            const sy = this.sy;
+            const n = i;
+            sy[n] -= 10;
+            const sms = this.sms;
+            const n2 = i;
+            ++sms[n2];
+            if (this.sms[i] !== 10) {
+              continue;
+            }
+            this.sms[i] = -1;
           }
-          this.sms[i] = -1;
         }
       } while (++i < 4);
     }
@@ -530,13 +532,15 @@ export class Tank {
         if (this.lhit[i] === 0) {
           continue;
         }
-        const lhit = this.lhit;
-        const n = i;
-        ++lhit[n];
-        if (this.lhit[i] <= 2) {
-          continue;
+        if (!this.lsr.m.interpolating) {
+          const lhit = this.lhit;
+          const n = i;
+          ++lhit[n];
+          if (this.lhit[i] <= 2) {
+            continue;
+          }
+          this.lstage[i] = 0;
         }
-        this.lstage[i] = 0;
       }
     } while (++i < 20);
   }

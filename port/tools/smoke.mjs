@@ -127,11 +127,34 @@ if (process.env.SMOKE_CLICK !== '0') {
 // at ~56ms/iteration in a race and ~40ms in the menus, so anything near the
 // display's 60Hz means the sleep is not being honoured and the game is running
 // several times too fast.
-const t0 = await send('Runtime.evaluate', { expression: 'window.__ticks', returnByValue: true });
+// TICKS are the simulation (the game's speed, ~18/s in a race and ~25/s in the
+// menus); DRAWS are frames put on screen, which with smooth motion on run at
+// the display's rate instead. Counting one for the other makes a working
+// interpolation look like a 3x speedup.
+const COUNTERS = ['cnt', 'cnts', 'cntf', 'cnty', 'wcnt', 'rcnt', 'tcnt', 'fase', 'selected'];
+const probe = `(() => {
+  const f = window.__game?.f, x = f?._xt;
+  const c = {};
+  for (const k of ${JSON.stringify(COUNTERS)}) c[k] = x ? x[k] : -1;
+  return { ticks: f?._ticks ?? -1, draws: f?._draws ?? -1, c };
+})()`;
+if (process.env.SMOKE_FORCE_INTERP) {
+  await send('Runtime.evaluate', {
+    expression: `window.__game.f._forceInterp = ${Number(process.env.SMOKE_FORCE_INTERP)}`,
+  });
+}
+const a = (await send('Runtime.evaluate', { expression: probe, returnByValue: true })).result.value;
 await sleep(4000);
-const t1 = await send('Runtime.evaluate', { expression: 'window.__ticks', returnByValue: true });
+const b = (await send('Runtime.evaluate', { expression: probe, returnByValue: true })).result.value;
 console.log('--- game loop ---');
-console.log(`${((t1.result.value - t0.result.value) / 4).toFixed(1)} iterations/sec (Java targets ~18/s in a race, ~25/s in menus)`);
+console.log(`ticks ${((b.ticks - a.ticks) / 4).toFixed(1)}/sec   draws ${((b.draws - a.draws) / 4).toFixed(1)}/sec`);
+// Absolute values as well as the delta: an unreachable handle reads -1 in both
+// samples, whose difference is 0 — indistinguishable from "nothing advanced".
+// Per TICK, not per second: that is the number the guards must hold constant.
+console.log('per tick: ' + COUNTERS.map((k) =>
+  `${k} ${((b.c[k] - a.c[k]) / Math.max(1, b.ticks - a.ticks)).toFixed(2)}`).join('  '));
+console.log('xtGraphics counters (value, advance over 4s): ' +
+  COUNTERS.map((k) => `${k}=${b.c[k]} +${b.c[k] - a.c[k]}`).join('  '));
 
 const pixels = await send('Runtime.evaluate', {
   expression: `(() => {

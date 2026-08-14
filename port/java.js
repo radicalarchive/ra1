@@ -71,15 +71,53 @@ export function setSeed(s) {
   _seed = s >>> 0 || 1;
 }
 
+// Float64, not Float32: a replayed value must be BIT-IDENTICAL to the one the
+// tick consumed, or the effect it drives lands somewhere fractionally else on
+// every interpolated frame — which is the shimmer the replay exists to remove.
+let _rlog = new Float64Array(8192);
+let _rn = 0;
+let _rp = 0;
+let _recording = false;
+let _replaying = false;
+
+export function startRandomRecording() {
+  _rn = 0;
+  _recording = true;
+  _replaying = false;
+}
+
+export function startRandomReplay() {
+  _rp = 0;
+  _recording = false;
+  _replaying = true;
+}
+
+export function stopRandom() {
+  _recording = false;
+  _replaying = false;
+}
+
 /** Uniform in [0,1), matching the contract of java.lang.Math.random(). */
 export function random() {
+  if (_replaying && _rn !== 0) {
+    return _rlog[_rp++ % _rn];
+  }
   // xorshift32
   let x = _seed;
   x ^= x << 13; x >>>= 0;
   x ^= x >>> 17;
   x ^= x << 5;  x >>>= 0;
   _seed = x;
-  return x / 4294967296;
+  const v = x / 4294967296;
+  if (_recording) {
+    if (_rn === _rlog.length) {
+      const grown = new Float64Array(_rn * 2);
+      grown.set(_rlog);
+      _rlog = grown;
+    }
+    _rlog[_rn++] = v;
+  }
+  return v;
 }
 
 // --- java.lang.String / Integer, where Java throws and JS shrugs -------------

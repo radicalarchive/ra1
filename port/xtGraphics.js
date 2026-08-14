@@ -133,13 +133,13 @@ export class xtGraphics {
         g.drawImage(this.mars, 0, 0);
         g.drawImage(this.text, 10, 380 - this.cnty);
         if (this.cnty !== 350) {
-          ++this.cnty;
+          if (!this.m.interpolating) ++this.cnty;
         } else {
           this.drawcs(g, 345, 'Press Enter to continue', 225, 225, 225, true);
-          this.cnty = 351;
+          if (!this.m.interpolating) this.cnty = 351;
         }
       }
-      if (control.space) {
+      if (control.space && !this.m.interpolating) {
         this.fase = -5;
         if (this.sgame === 1) {
           this.select = 1;
@@ -152,7 +152,7 @@ export class xtGraphics {
     if (this.fase === -7) {
       g.drawImage(this.inst1, 0, 0);
       this.drawcs(g, 354, 'Press Enter to continue >', 170, 170, 170, false);
-      if (control.space) {
+      if (control.space && !this.m.interpolating) {
         this.fase = -6;
         control.space = false;
       }
@@ -160,7 +160,7 @@ export class xtGraphics {
     if (this.fase === -6) {
       g.drawImage(this.inst2, 0, 0);
       this.drawcs(g, 354, 'Press Enter to continue >', 170, 170, 170, false);
-      if (control.space) {
+      if (control.space && !this.m.interpolating) {
         this.fase = -55;
         control.space = false;
       }
@@ -168,7 +168,7 @@ export class xtGraphics {
     if (this.fase === -55) {
       g.drawImage(this.inst3, 0, 0);
       this.drawcs(g, 354, 'Press Enter to continue >', 170, 170, 170, false);
-      if (control.space) {
+      if (control.space && !this.m.interpolating) {
         this.fase = this.oldfase;
         control.space = false;
       }
@@ -178,22 +178,24 @@ export class xtGraphics {
       if (this.cnt < 7) {
         g.drawImage(this.as[this.select], 25, 283);
         g.drawImage(this.as[this.select], 423, 283);
-        ++this.cnt;
+        if (!this.m.interpolating) ++this.cnt;
       } else {
-        this.cnt = 0;
+        if (!this.m.interpolating) this.cnt = 0;
       }
       g.setColor(colorOf(225, 230, 255));
       let k = 50 + trunc(random() * 150.0);
       g.drawLine(trunc(random() * 400.0), k, trunc(random() * 200.0), k);
       k = 50 + trunc(random() * 150.0);
       g.drawLine(500 - trunc(random() * 400.0), k, 500 - trunc(random() * 200.0), k);
-      if (this.cnts < -900) {
-        this.cnts = 0;
-        this.cntf = trunc(random() * 150.0);
-      } else {
-        this.cnts -= 7;
+      if (!this.m.interpolating) {
+        if (this.cnts < -900) {
+          this.cnts = 0;
+          this.cntf = trunc(random() * 150.0);
+        } else {
+          this.cnts -= 7;
+        }
       }
-      if (control.space) {
+      if (control.space && !this.m.interpolating) {
         this.cnts = 10;
       }
       g.drawImage(this.rad, 500 + this.cnts, 50 + this.cntf);
@@ -201,12 +203,12 @@ export class xtGraphics {
       if (this.sgame !== 0) {
         this.drawcs(g, 289, 'Resume Saved Game', 0, 0, 0, false);
       } else {
-        if (control.space && this.select === 1) {
+        if (control.space && this.select === 1 && !this.m.interpolating) {
           this.wcnt = 20;
         }
         if (this.wcnt !== 0) {
           this.drawcs(g, 289, 'No Saved Game!', 100, 0, 0, false);
-          --this.wcnt;
+          if (!this.m.interpolating) --this.wcnt;
         } else {
           this.drawcs(g, 289, 'Resume Saved Game', 200, 200, 200, false);
         }
@@ -216,7 +218,7 @@ export class xtGraphics {
       this.drawcs(g, 334, 'Exit Game', 0, 0, 0, false);
       if (!this.flik) {
         g.setColor(colorOf(225, 230, 255));
-        this.flik = true;
+        if (!this.m.interpolating) this.flik = true;
         g.drawLine(250 - this.ws[this.select], 271 + 15 * this.select, 250 + this.ws[this.select], 271 + 15 * this.select);
         g.drawRect(250 - this.ws[this.select], 264 + 15 * this.select, this.ws[this.select] * 2, 11);
         g.setColor(colorOf(0, 0, 0));
@@ -225,40 +227,42 @@ export class xtGraphics {
       } else {
         g.setColor(colorOf(168, 183, 255));
         g.drawRect(250 - this.ws[this.select], 264 + 15 * this.select, this.ws[this.select] * 2, 11);
-        this.flik = false;
+        if (!this.m.interpolating) this.flik = false;
       }
-      if (control.down) {
-        ++this.select;
-        control.down = false;
-      }
-      if (control.up) {
-        --this.select;
-        control.up = false;
-      }
-      if (this.select === 5) {
-        this.select = 0;
-      }
-      if (this.select === -1) {
-        this.select = 4;
-      }
-      if (control.space) {
-        if (this.select === 2) {
-          this.fase = -7;
-          this.oldfase = -5;
-          control.space = false;
+      if (!this.m.interpolating) {
+        if (control.down) {
+          ++this.select;
+          control.down = false;
         }
-        if (this.select === 3) {
-          this.fase = 4;
-          control.space = false;
+        if (control.up) {
+          --this.select;
+          control.up = false;
+        }
+        if (this.select === 5) {
+          this.select = 0;
+        }
+        if (this.select === -1) {
+          this.select = 4;
+        }
+        if (control.space) {
+          if (this.select === 2) {
+            this.fase = -7;
+            this.oldfase = -5;
+            control.space = false;
+          }
+          if (this.select === 3) {
+            this.fase = 4;
+            control.space = false;
+          }
         }
       }
       this.drawcs(g, 354, '( use keyboard arrows to select and press Enter )', 170, 170, 170, false);
-      if (this.frst) {
+      if (this.frst && !this.m.interpolating) {
         this.frst = false;
       }
     }
     if (this.fase === -4) {
-      if (control.space) {
+      if (control.space && !this.m.interpolating) {
         this.fase = -3;
         control.space = false;
       } else {
@@ -275,10 +279,10 @@ export class xtGraphics {
         this.drawcs(g, 30, 'The Mars Station..', 255, 255, 255, true);
         if (l2 < 90 || this.flik) {
           this.drawcs(g, 60, 'Damage status:  ' + l2 + '%', 0, 0, 0, false);
-          this.flik = false;
+          if (!this.m.interpolating) this.flik = false;
         } else {
           this.drawcs(g, 60, 'Damage status:  ' + l2 + '%', 255, 0, 0, false);
-          this.flik = true;
+          if (!this.m.interpolating) this.flik = true;
         }
         if (!this.frst) {
           this.drawcs(g, 340, 'Press Enter to continue', 255, 255, 255, false);
@@ -296,7 +300,7 @@ export class xtGraphics {
             g.setColor(colorOf(192, 192, 192));
             g.drawRect(256, 319, 22, 14);
           }
-          if (control.up || control.down || control.left || control.right) {
+          if (!this.m.interpolating && (control.up || control.down || control.left || control.right)) {
             if (this.select === 0) {
               this.select = 1;
             } else {
@@ -364,56 +368,62 @@ export class xtGraphics {
         } else {
           aconto[this.selected].wire = false;
         }
-        if (this.wcnt > 9) {
-          this.wcnt = 0;
-        } else {
-          ++this.wcnt;
+        if (!this.m.interpolating) {
+          if (this.wcnt > 9) {
+            this.wcnt = 0;
+          } else {
+            ++this.wcnt;
+          }
         }
       }
       if (this.rcnt === 0) {
-        if (control.left) {
-          this.left = true;
-          this.rcnt = 1;
-        }
-        if (control.right) {
-          this.left = false;
-          this.rcnt = 1;
+        if (!this.m.interpolating) {
+          if (control.left) {
+            this.left = true;
+            this.rcnt = 1;
+          }
+          if (control.right) {
+            this.left = false;
+            this.rcnt = 1;
+          }
         }
       } else {
-        let k3 = 0;
-        do {
-          if (aconto[k3].x === 2000) {
-            aconto[k3].x = -500;
-          }
-          if (aconto[k3].x === -2000) {
-            aconto[k3].x = 500;
-          }
-          if (this.left) {
-            const contO = aconto[k3];
-            contO.x -= 100;
-          } else {
-            const contO2 = aconto[k3];
-            contO2.x += 100;
-          }
-        } while (++k3 < 5);
-        aconto[this.selected].wire = false;
-        ++this.rcnt;
-        if (this.rcnt === 6) {
-          this.wcnt = 7;
-          this.rcnt = 0;
-          if (this.left) {
-            if (this.selected !== 4) {
-              ++this.selected;
-            } else {
-              this.selected = 0;
+        if (!this.m.interpolating) {
+          let k3 = 0;
+          do {
+            if (aconto[k3].x === 2000) {
+              aconto[k3].x = -500;
             }
-          } else if (this.selected !== 0) {
-            --this.selected;
-          } else {
-            this.selected = 4;
+            if (aconto[k3].x === -2000) {
+              aconto[k3].x = 500;
+            }
+            if (this.left) {
+              const contO = aconto[k3];
+              contO.x -= 100;
+            } else {
+              const contO2 = aconto[k3];
+              contO2.x += 100;
+            }
+          } while (++k3 < 5);
+          aconto[this.selected].wire = false;
+          ++this.rcnt;
+          if (this.rcnt === 6) {
+            this.wcnt = 7;
+            this.rcnt = 0;
+            if (this.left) {
+              if (this.selected !== 4) {
+                ++this.selected;
+              } else {
+                this.selected = 0;
+              }
+            } else if (this.selected !== 0) {
+              --this.selected;
+            } else {
+              this.selected = 4;
+            }
+            aconto[this.selected].hit = true;
+            aconto[this.selected].nhits = 0;
           }
-          aconto[this.selected].hit = true;
-          aconto[this.selected].nhits = 0;
         }
       }
       if (control.space) {
@@ -423,8 +433,10 @@ export class xtGraphics {
       let l3 = 0;
       do {
         aconto[l3].d(g);
-        const contO3 = aconto[l3];
-        contO3.xz += 2;
+        if (!this.m.interpolating) {
+          const contO3 = aconto[l3];
+          contO3.xz += 2;
+        }
       } while (++l3 < 5);
       if (this.dest[this.selected] && this.rcnt === 0) {
         g.drawImage(this.destr, 117, 103);
@@ -493,8 +505,10 @@ export class xtGraphics {
       for (let i3 = 0; i3 < this.nb; ++i3) {
         g.drawImage(this.lay, 79, 90 + 80 * i3);
         aconto[this.ob[i3]].d(g);
-        const contO4 = aconto[this.ob[i3]];
-        contO4.xz += 7 + i3;
+        if (!this.m.interpolating) {
+          const contO4 = aconto[this.ob[i3]];
+          contO4.xz += 7 + i3;
+        }
         this.drawcs(g, 125 + 80 * i3, this.nam[i3], 0, 0, 0, false);
       }
       if (this.nb === 0) {
@@ -504,18 +518,18 @@ export class xtGraphics {
       } else if (this.goodsun) {
         if (this.flik) {
           this.drawcs(g, 110 + 80 * this.nb, 'Click Screen to Continue >', 180, 180, 150, true);
-          this.flik = false;
+          if (!this.m.interpolating) this.flik = false;
         } else {
           this.drawcs(g, 110 + 80 * this.nb, 'Click Screen to Continue >', 255, 255, 240, true);
-          this.flik = true;
+          if (!this.m.interpolating) this.flik = true;
         }
       } else {
         this.drawcs(g, 110 + 80 * this.nb, 'Click screen or Press Enter to continue >', 180, 180, 150, true);
       }
-      if (!control.canclick) {
+      if (!control.canclick && !this.m.interpolating) {
         control.canclick = true;
       }
-      if (control.space) {
+      if (control.space && !this.m.interpolating) {
         control.canclick = false;
         if (this.nb !== 0) {
           for (let j4 = 0; j4 < this.nb; ++j4) {
@@ -537,10 +551,10 @@ export class xtGraphics {
     }
     if (this.fase === 1) {
       g.drawImage(this.mback, 0, 0);
-      if (this.frst) {
+      if (this.frst && !this.m.interpolating) {
         this.frst = false;
       }
-      if (control.space) {
+      if (control.space && !this.m.interpolating) {
         this.fase = -3;
         control.space = false;
         this.drawcs(g, 230, 'Loading Mission ' + (this.level + 1) + ' again...', 255, 255, 255, true);
@@ -559,7 +573,7 @@ export class xtGraphics {
         this.drawcs(g, 180, 'The mars station was destroyed!', 255, 255, 255, true);
       }
       this.drawcs(g, 320, 'Press Enter to continue', 225, 225, 225, true);
-      if (control.space) {
+      if (control.space && !this.m.interpolating) {
         this.fase = -5;
         if (this.alldest() && this.sgame === 1) {
           this.select = 1;
@@ -576,40 +590,42 @@ export class xtGraphics {
       this.drawcs(g, 203, 'Quit Game', 255, 255, 255, false);
       if (this.flik) {
         g.setColor(colorOf(255, 0, 0));
-        this.flik = false;
+        if (!this.m.interpolating) this.flik = false;
       } else {
         g.setColor(colorOf(0, 128, 255));
-        this.flik = true;
+        if (!this.m.interpolating) this.flik = true;
       }
       g.drawRect(190, 153 + this.select * 20, 120, 11);
-      if (control.down) {
-        ++this.select;
-        control.down = false;
-      }
-      if (control.up) {
-        --this.select;
-        control.up = false;
-      }
-      if (this.select === 3) {
-        this.select = 0;
-      }
-      if (this.select === -1) {
-        this.select = 2;
-      }
-      if (control.space) {
-        if (this.select === 1) {
-          this.fase = -7;
-          this.oldfase = 3;
-          control.space = false;
+      if (!this.m.interpolating) {
+        if (control.down) {
+          ++this.select;
+          control.down = false;
         }
-        if (this.select === 2) {
-          this.fase = -5;
-          if (this.sgame === 1) {
-            this.select = 1;
-          } else {
-            this.select = 0;
+        if (control.up) {
+          --this.select;
+          control.up = false;
+        }
+        if (this.select === 3) {
+          this.select = 0;
+        }
+        if (this.select === -1) {
+          this.select = 2;
+        }
+        if (control.space) {
+          if (this.select === 1) {
+            this.fase = -7;
+            this.oldfase = 3;
+            control.space = false;
           }
-          control.space = false;
+          if (this.select === 2) {
+            this.fase = -5;
+            if (this.sgame === 1) {
+              this.select = 1;
+            } else {
+              this.select = 0;
+            }
+            control.space = false;
+          }
         }
       }
       this.drawcs(g, 354, '( use keyboard arrows to select )', 210, 210, 210, false);
@@ -618,20 +634,22 @@ export class xtGraphics {
       g.setColor(colorOf(255, 255, 255));
       g.fillRect(80, 60, 340, 190);
       aconto[trunc(random() * 5.0)].d(g);
-      let k4 = 0;
-      do {
-        const contO5 = aconto[k4];
-        contO5.zy += 5;
-        const contO6 = aconto[k4];
-        --contO6.xy;
-      } while (++k4 < 5);
-      if (aconto[0].zy === 360) {
-        aconto[0].zy = 0;
-        g.setColor(colorOf(255, 255, 0));
-        let l4 = 0;
+      if (!this.m.interpolating) {
+        let k4 = 0;
         do {
-          g.drawLine(l4 * 2, 0, l4 * 2, 360);
-        } while (++l4 < 250);
+          const contO5 = aconto[k4];
+          contO5.zy += 5;
+          const contO6 = aconto[k4];
+          --contO6.xy;
+        } while (++k4 < 5);
+        if (aconto[0].zy === 360) {
+          aconto[0].zy = 0;
+          g.setColor(colorOf(255, 255, 0));
+          let l4 = 0;
+          do {
+            g.drawLine(l4 * 2, 0, l4 * 2, 360);
+          } while (++l4 < 250);
+        }
       }
       g.drawImage(this.rad, 93, 32);
       if (this.fase === 5) {
@@ -662,21 +680,23 @@ export class xtGraphics {
       if (this.fase === 7) {
         if (this.flik) {
           this.drawcs(g, 140, 'G a m e   C o m p l e t e !', 255, 0, 0, false);
-          this.flik = false;
+          if (!this.m.interpolating) this.flik = false;
         } else {
           this.drawcs(g, 140, 'G a m e   C o m p l e t e !', 0, 128, 255, true);
-          this.flik = true;
+          if (!this.m.interpolating) this.flik = true;
         }
         this.drawcs(g, 180, '>  Press Enter to continue  >', 150, 150, 150, false);
-        ++this.cnt;
-        if (this.cnt > 140) {
-          control.space = true;
+        if (!this.m.interpolating) {
+          ++this.cnt;
+          if (this.cnt > 140) {
+            control.space = true;
+          }
         }
       } else {
         this.drawcs(g, 246, 'Press Enter to continue >', 150, 150, 150, false);
       }
       this.drawcs(g, 354, 'Copyright © RadicalPlay.com', 255, 255, 255, true);
-      if (control.space && this.fase !== 7) {
+      if (control.space && this.fase !== 7 && !this.m.interpolating) {
         if (this.fase === 5) {
           this.fase = 6;
         } else {
@@ -1065,31 +1085,33 @@ export class xtGraphics {
           } else {
             this.drawcs(g, 120, this.mname[k1 - 1] + ' Crashed!', 186, 223, 57, false);
           }
-          if (this.cntf < 2) {
-            ++this.cntf;
-          } else {
-            this.cntf = 0;
+          if (!this.m.interpolating) {
+            if (this.cntf < 2) {
+              ++this.cntf;
+            } else {
+              this.cntf = 0;
+            }
+            const cnte = this.cnte;
+            const n = k1 - 1;
+            ++cnte[n];
           }
-          const cnte = this.cnte;
-          const n = k1 - 1;
-          ++cnte[n];
           flag2 = true;
         } else {
           ++j2;
         }
       }
     }
-    if (!this.mcomp && j2 === i - 1) {
+    if (!this.mcomp && j2 === i - 1 && !this.m.interpolating) {
       this.mcomp = true;
       this.select = 0;
     }
     if (this.mcomp && !aconto[ai1[0]].exp) {
       if (this.rcnt === 0) {
-        this.rcnt = 1;
+        if (!this.m.interpolating) this.rcnt = 1;
       } else {
         g.setColor(colorOf(50 + trunc(random() * 200.0), 50 + trunc(random() * 200.0), 50 + trunc(random() * 200.0)));
         g.fillRect(110, 67, 270, 13);
-        this.rcnt = 0;
+        if (!this.m.interpolating) this.rcnt = 0;
       }
       g.drawImage(this.complete, 105, 60);
       this.drawcs(g, 300, 'Press Enter to continue', 0, 0, 0, false);
@@ -1166,24 +1188,28 @@ export class xtGraphics {
       if (this.cnt > 90) {
         if (this.flik) {
           this.drawcs(g, 300, 'Recharge Ship !', 255, 255, 255, false);
-          this.flik = false;
+          if (!this.m.interpolating) this.flik = false;
         } else {
           this.drawcs(g, 300, 'Recharge Ship !', 200, 200, 200, false);
-          this.flik = true;
+          if (!this.m.interpolating) this.flik = true;
         }
       } else {
         this.drawcs(g, 300, 'Damage Critical', 255, 0, 0, false);
       }
-      ++this.cnt;
-      if (this.cnt === 130) {
-        this.cnt = 0;
+      if (!this.m.interpolating) {
+        ++this.cnt;
+        if (this.cnt === 130) {
+          this.cnt = 0;
+        }
       }
     }
     if (control.jump >= 1 && usercraft.njumps === 0) {
       this.drawcs(g, 330, 'Light speed jumps expired - Recharge Ship !', 255, 255, 255, false);
-      ++control.jump;
-      if (control.jump === 40) {
-        control.jump = 0;
+      if (!this.m.interpolating) {
+        ++control.jump;
+        if (control.jump === 40) {
+          control.jump = 0;
+        }
       }
     }
     if (usercraft.ester !== 0 && !aconto[ai1[0]].exp && !this.mcomp) {
@@ -1232,23 +1258,27 @@ export class xtGraphics {
       const i7 = trunc(fr(260.0 - fr(usercraft.rspeed * fr(200.0 / usercraft.maxspeed[usercraft.ltyp]))));
       g.setColor(colorOf(255, i7 - 10, 0));
       g.fillRect(61, i7, 12, 260 - i7);
-      if (control.plus || control.mins) {
-        this.cnts = 0;
-      } else {
-        ++this.cnts;
+      if (!this.m.interpolating) {
+        if (control.plus || control.mins) {
+          this.cnts = 0;
+        } else {
+          ++this.cnts;
+        }
       }
     }
     if (this.tcnt !== 0) {
-      if (usercraft.rspeed === 0) {
-        ++this.tcnt;
-      } else {
-        this.tcnt = 0;
+      if (!this.m.interpolating) {
+        if (usercraft.rspeed === 0) {
+          ++this.tcnt;
+        } else {
+          this.tcnt = 0;
+        }
       }
       if (!control.space) {
         if (this.tcnt > 90) {
           this.drawcs(g, 80, 'Press Enter for game controls and to pause game!', 255, 255, 255, false);
         }
-      } else {
+      } else if (!this.m.interpolating) {
         this.tcnt = 0;
       }
     }

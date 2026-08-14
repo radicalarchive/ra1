@@ -51,6 +51,13 @@ export class Graphics2D {
    */
   constructor(ctx, scale = 1) {
     this.scale = scale;
+    // Set while a tick draws under smooth motion: the geometry still runs (it
+    // computes ContO.dist, which feeds the next depth sort) but nothing is
+    // rasterised, because the interpolated passes that follow are what the
+    // player actually sees. Without this the tick paints state N and the
+    // interpolated frames then replay N-1 -> N over the same window, so every
+    // tick visibly rewinds.
+    this.mute = false;
     if (scale !== 1) ctx.setTransform(scale, 0, 0, scale, 0, 0);
     this.ctx = ctx;
     this.ctx.textBaseline = 'alphabetic';   // Java's drawString y IS the baseline
@@ -92,11 +99,13 @@ export class Graphics2D {
    * smoke effects emit, so the rule is not optional.
    */
   fillPolygon(xs, ys, n) {
+    if (this.mute) return;
     this._path(xs, ys, n);
     this.ctx.fill('evenodd');
   }
 
   drawPolygon(xs, ys, n) {
+    if (this.mute) return;
     this._path(xs, ys, n);
     this.ctx.stroke();
   }
@@ -106,6 +115,7 @@ export class Graphics2D {
   // coordinate straddles two pixel rows. The +0.5 puts the line back where AWT
   // draws it.
   drawLine(x0, y0, x1, y1) {
+    if (this.mute) return;
     const ctx = this.ctx;
     ctx.beginPath();
     ctx.moveTo(x0 + 0.5, y0 + 0.5);
@@ -114,23 +124,28 @@ export class Graphics2D {
   }
 
   fillRect(x, y, w, h) {
+    if (this.mute) return;
     this.ctx.fillRect(x, y, w, h);
   }
 
   drawRect(x, y, w, h) {
+    if (this.mute) return;
     this.ctx.strokeRect(x + 0.5, y + 0.5, w, h);
   }
 
   clearRect(x, y, w, h) {
+    if (this.mute) return;
     this.ctx.clearRect(x, y, w, h);
   }
 
   drawString(s, x, y) {
+    if (this.mute) return;
     this.ctx.fillText(s, x, y);
   }
 
   /** `g.drawImage(img, x, y, observer)` and the 5-arg scaled form. */
   drawImage(img, x, y, w, h) {
+    if (this.mute) return;
     if (img === null) return;
     const src = img.canvas !== undefined ? img.canvas : img;
     if (w === undefined) this.ctx.drawImage(src, x, y);

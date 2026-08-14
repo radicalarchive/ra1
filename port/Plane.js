@@ -38,7 +38,7 @@
 //
 // No Case A sites were found in this file.
 
-import { idiv, i32, trunc, fr, intArray, at, colorOf } from './java.js';
+import { idiv, i32, trunc, fr, intArray, at, colorOf, random } from './java.js';
 
 export class Plane {
   constructor(medium, ai, ai1, ai2, i, ai3) {
@@ -145,10 +145,10 @@ export class Plane {
       this.rot(ai, ai3, i, j, i1, this.n);
       this.rot(ai3, ai2, j, k, j1, this.n);
       this.rot(ai, ai2, i, k, l, this.n);
-      if (this.exp === 2) {
-        this.sdx = trunc(Math.random() * 100.0 - 50.0);
-        this.sdz = trunc(Math.random() * 100.0 - 50.0);
-        this.sdy = Math.random() * 100.0 - 50.0;
+      if (this.exp === 2 && !this.m.interpolating) {
+        this.sdx = trunc(random() * 100.0 - 50.0);
+        this.sdz = trunc(random() * 100.0 - 50.0);
+        this.sdy = random() * 100.0 - 50.0;
         this.sx[0] = this.ofcx + ai[this.nx] + 2 - i;
         this.sx[1] = this.ofcx + ai[this.nx] - 2 - i;
         this.sy[0] = this.ofcy + ai3[this.ny] + 2 - j;
@@ -166,9 +166,11 @@ export class Plane {
         this.exp = 3;
       }
       if (this.exp !== 0) {
-        this.ofx += this.adx;
-        this.ofz += this.adz;
-        this.ofy += trunc(this.ady);   // §2 Case B: explicit (int) cast of double field
+        if (!this.m.interpolating) {
+          this.ofx += this.adx;
+          this.ofz += this.adz;
+          this.ofy += trunc(this.ady);   // §2 Case B: explicit (int) cast of double field
+        }
         for (let l2 = 0; l2 < this.n; ++l2) {
           const array = ai;
           const n = l2;
@@ -182,14 +184,16 @@ export class Plane {
         }
         this.rot(ai3, ai2, this.ofcy + ai3[this.ny], this.ofcz + ai2[this.nx], this.ezy, this.n);
         this.rot(ai, ai3, this.ofcx + ai[this.nx], this.ofcy + ai3[this.ny], this.exy, this.n);
-        for (let i2 = 0; i2 < this.n; ++i2) {
-          if (ai3[i2] > this.m.ground) {
-            this.exp = 7;
+        if (!this.m.interpolating) {
+          for (let i2 = 0; i2 < this.n; ++i2) {
+            if (ai3[i2] > this.m.ground) {
+              this.exp = 7;
+            }
           }
+          this.ezy += this.azy;
+          this.exy += this.axy;
+          this.ady += 0.5;
         }
-        this.ezy += this.azy;
-        this.exy += this.axy;
-        this.ady += 0.5;
         if (this.sy[3] < this.m.ground) {
           const ai4 = intArray(4);
           const ai5 = intArray(4);
@@ -197,10 +201,10 @@ export class Plane {
           let l3 = 0;
           do {
             if (this.exp < 6) {
-              ai4[l3] = this.sx[l3] + i + trunc(Math.random() * 50.0 - 25.0);
-              ai5[l3] = this.sy[l3] + j + trunc(Math.random() * 50.0 - 25.0);
-              ai6[l3] = this.sz[l3] + k + trunc(Math.random() * 50.0 - 25.0);
-              if (this.exp >= 4) {
+              ai4[l3] = this.sx[l3] + i + trunc(random() * 50.0 - 25.0);
+              ai5[l3] = this.sy[l3] + j + trunc(random() * 50.0 - 25.0);
+              ai6[l3] = this.sz[l3] + k + trunc(random() * 50.0 - 25.0);
+              if (this.exp >= 4 && !this.m.interpolating) {
                 ++this.exp;
               }
             }
@@ -209,17 +213,21 @@ export class Plane {
               ai5[l3] = this.sy[l3] + j;
               ai6[l3] = this.sz[l3] + k;
             }
-            const sx = this.sx;
-            const n4 = l3;
-            sx[n4] += this.sdx;
-            const sy = this.sy;
-            const n5 = l3;
-            sy[n5] += trunc(this.sdy);   // §2 Case B: explicit (int) cast of double field
-            const sz = this.sz;
-            const n6 = l3;
-            sz[n6] += this.sdz;
+            if (!this.m.interpolating) {
+              const sx = this.sx;
+              const n4 = l3;
+              sx[n4] += this.sdx;
+              const sy = this.sy;
+              const n5 = l3;
+              sy[n5] += trunc(this.sdy);   // §2 Case B: explicit (int) cast of double field
+              const sz = this.sz;
+              const n6 = l3;
+              sz[n6] += this.sdz;
+            }
           } while (++l3 < 4);
-          this.sdy += 0.5;
+          if (!this.m.interpolating) {
+            this.sdy += 0.5;
+          }
           this.rot(ai4, ai6, this.m.cx, this.m.cz, this.m.xz, 4);
           this.rot(ai5, ai6, this.m.cy, this.m.cz, this.m.zy, 4);
           const ai7 = intArray(4);
@@ -237,14 +245,18 @@ export class Plane {
             g.setColor(colorOf(this.sr, this.sg, 111));
             if (this.exp === 3) {
               g.setColor(colorOf(255, 255, 255));
-              this.exp = 4;
+              if (!this.m.interpolating) {
+                this.exp = 4;
+              }
             }
             g.fillPolygon(ai7, ai8, 4);
-            if (this.sr > 111) {
-              this.sr -= 2;
-            }
-            if (this.sg > 111) {
-              this.sg -= 2;
+            if (!this.m.interpolating) {
+              if (this.sr > 111) {
+                this.sr -= 2;
+              }
+              if (this.sg > 111) {
+                this.sg -= 2;
+              }
             }
           }
         }
@@ -472,18 +484,18 @@ export class Plane {
       this.rot(ai, ai3, i, j, i1, this.n);
       this.rot(ai3, ai2, j, k, j1, this.n);
       this.rot(ai, ai2, i, k, l, this.n);
-      if (this.exp === 1) {
-        this.adx = trunc(Math.random() * 30.0 - 15.0);
-        this.adz = trunc(Math.random() * 30.0 - 15.0);
-        this.ady = -(Math.random() * 20.0);
-        this.ofcx = trunc(Math.random() * 10.0 - 5.0);
-        this.ofcy = trunc(Math.random() * 10.0 - 5.0);
-        this.ofcz = trunc(Math.random() * 10.0 - 5.0);
-        this.nx = trunc(Math.random() * this.n);
-        this.ny = trunc(Math.random() * this.n);
-        this.nz = trunc(Math.random() * this.n);
-        this.azy = trunc(Math.random() * 30.0 - 15.0);
-        this.axy = trunc(Math.random() * 30.0 - 15.0);
+      if (this.exp === 1 && !this.m.interpolating) {
+        this.adx = trunc(random() * 30.0 - 15.0);
+        this.adz = trunc(random() * 30.0 - 15.0);
+        this.ady = -(random() * 20.0);
+        this.ofcx = trunc(random() * 10.0 - 5.0);
+        this.ofcy = trunc(random() * 10.0 - 5.0);
+        this.ofcz = trunc(random() * 10.0 - 5.0);
+        this.nx = trunc(random() * this.n);
+        this.ny = trunc(random() * this.n);
+        this.nz = trunc(random() * this.n);
+        this.azy = trunc(random() * 30.0 - 15.0);
+        this.axy = trunc(random() * 30.0 - 15.0);
         this.exy = 0;
         this.ezy = 0;
         this.ofx = 0;
@@ -492,9 +504,11 @@ export class Plane {
         this.exp = 2;
       }
       if (this.exp !== 0) {
-        this.ofx += this.adx;
-        this.ofz += this.adz;
-        this.ofy += trunc(this.ady);   // §2 Case B: explicit (int) cast of double field
+        if (!this.m.interpolating) {
+          this.ofx += this.adx;
+          this.ofz += this.adz;
+          this.ofy += trunc(this.ady);   // §2 Case B: explicit (int) cast of double field
+        }
         for (let l2 = 0; l2 < this.n; ++l2) {
           const array = ai;
           const n = l2;

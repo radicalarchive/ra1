@@ -23,7 +23,7 @@
 // KeySettings.txt is written in those numbers, so input.js maps DOM keys back
 // to them rather than inventing a new scheme. See its header.
 
-import { trunc, parseIntJava, colorOf, intArray, random } from './java.js';
+import { trunc, parseIntJava, colorOf, intArray, random, startRandomRecording, startRandomReplay, stopRandom } from './java.js';
 import * as vfs from './vfs.js';
 import * as assets from './assets.js';
 import { Graphics2D, JImage, createImage, loadImage } from './graphics.js';
@@ -109,9 +109,18 @@ export class F51 {
     this.frags = 0;
     this.dnload = 0;
 
+    // Diagnostics for port/tools/smoke.mjs. `_ticks` counts SIMULATION steps
+    // (the game's speed) and `_draws` counts frames put on screen; with smooth
+    // motion on they differ, and confusing the two makes a working feature look
+    // like a 3x speedup.
+    this._ticks = 0;
+    this._draws = 0;
+    this._forceInterp = 0;
+
     this.rd = null;        // the offscreen Graphics (graphics.js)
     this.offImage = null;
     this.gamer = null;     // the rAF handle, where Java had a Thread
+    this.smooth = false;
   }
 
   // --- the two parsers every loader goes through ---------------------------
@@ -773,6 +782,7 @@ export class F51 {
   async init(canvas, opts = {}) {
     const scale = opts.scale || 1;
     this.scale = scale;
+    this.smooth = !!opts.smooth;
 
     // 2. GRAPHICS: create the offscreen surface / Graphics2D over the canvas
     if (canvas) {
@@ -1207,6 +1217,10 @@ export class F51 {
     // Thread priority (this.gamer.setPriority(10)) has no browser JS equivalent.
     const medium = new Medium();
     const xtgraphics = new xtGraphics(medium, this.rd);
+    // Diagnostics handle for port/tools/smoke.mjs: xtgraphics is a local of
+    // run(), and its per-frame counters are how a smoke run checks that
+    // interpolated frames advance no animation state.
+    this._xt = xtgraphics;
     let i = 5;
     const s = "1.8";
     const s2 = "";
@@ -1279,9 +1293,106 @@ export class F51 {
       ? requestAnimationFrame
       : (cb) => setTimeout(cb, 16);
 
-    while (this.gamer) {
-      let date2 = new Date();
-      const l4 = Date.now();
+    const snapPrev = {
+      obj2: new Array(3000).fill(null).map(() => ({ x: 0, y: 0, z: 0, xz: 0, xy: 0, zy: 0, dist: 0 })),
+      obj: new Array(53).fill(null).map(() => ({ x: 0, y: 0, z: 0, xz: 0, xy: 0, zy: 0, dist: 0 })),
+      cam: { x: 0, y: 0, z: 0, xz: 0, zy: 0 },
+    };
+    const snapCurr = {
+      obj2: new Array(3000).fill(null).map(() => ({ x: 0, y: 0, z: 0, xz: 0, xy: 0, zy: 0, dist: 0 })),
+      obj: new Array(53).fill(null).map(() => ({ x: 0, y: 0, z: 0, xz: 0, xy: 0, zy: 0, dist: 0 })),
+      cam: { x: 0, y: 0, z: 0, xz: 0, zy: 0 },
+    };
+
+    const capture = (snap) => {
+      for (let idx = 0; idx < this.maxco; idx++) {
+        const o = aconto2[idx];
+        const s = snap.obj2[idx];
+        if (!o) continue;
+        s.x = o.x; s.y = o.y; s.z = o.z;
+        s.xz = o.xz; s.xy = o.xy; s.zy = o.zy;
+        s.dist = o.dist;
+      }
+      for (let idx = 0; idx < 53; idx++) {
+        const o = aconto[idx];
+        const s = snap.obj[idx];
+        if (!o) continue;
+        s.x = o.x; s.y = o.y; s.z = o.z;
+        s.xz = o.xz; s.xy = o.xy; s.zy = o.zy;
+        s.dist = o.dist;
+      }
+      snap.cam.x = medium.x;
+      snap.cam.y = medium.y;
+      snap.cam.z = medium.z;
+      snap.cam.xz = medium.xz;
+      snap.cam.zy = medium.zy;
+    };
+
+    const blend = (a, b, t, isAngle) => {
+      if (!isAngle) return a + (b - a) * t;
+      let d = b - a;
+      while (d > 180) d -= 360;
+      while (d < -180) d += 360;
+      return a + d * t;
+    };
+
+    const applyBlend = (t) => {
+      for (let idx = 0; idx < this.maxco; idx++) {
+        const o = aconto2[idx];
+        const p = snapPrev.obj2[idx];
+        const c = snapCurr.obj2[idx];
+        if (!o || !p || !c) continue;
+        o.x = Math.round(blend(p.x, c.x, t, false));
+        o.y = Math.round(blend(p.y, c.y, t, false));
+        o.z = Math.round(blend(p.z, c.z, t, false));
+        o.xz = blend(p.xz, c.xz, t, true);
+        o.xy = blend(p.xy, c.xy, t, true);
+        o.zy = blend(p.zy, c.zy, t, true);
+      }
+      for (let idx = 0; idx < 53; idx++) {
+        const o = aconto[idx];
+        const p = snapPrev.obj[idx];
+        const c = snapCurr.obj[idx];
+        if (!o || !p || !c) continue;
+        o.x = Math.round(blend(p.x, c.x, t, false));
+        o.y = Math.round(blend(p.y, c.y, t, false));
+        o.z = Math.round(blend(p.z, c.z, t, false));
+        o.xz = blend(p.xz, c.xz, t, true);
+        o.xy = blend(p.xy, c.xy, t, true);
+        o.zy = blend(p.zy, c.zy, t, true);
+      }
+      medium.x = Math.round(blend(snapPrev.cam.x, snapCurr.cam.x, t, false));
+      medium.y = Math.round(blend(snapPrev.cam.y, snapCurr.cam.y, t, false));
+      medium.z = Math.round(blend(snapPrev.cam.z, snapCurr.cam.z, t, false));
+      medium.xz = blend(snapPrev.cam.xz, snapCurr.cam.xz, t, true);
+      medium.zy = blend(snapPrev.cam.zy, snapCurr.cam.zy, t, true);
+    };
+
+    const restoreCurr = () => {
+      for (let idx = 0; idx < this.maxco; idx++) {
+        const o = aconto2[idx];
+        const c = snapCurr.obj2[idx];
+        if (!o || !c) continue;
+        o.x = c.x; o.y = c.y; o.z = c.z;
+        o.xz = c.xz; o.xy = c.xy; o.zy = c.zy;
+        o.dist = c.dist;
+      }
+      for (let idx = 0; idx < 53; idx++) {
+        const o = aconto[idx];
+        const c = snapCurr.obj[idx];
+        if (!o || !c) continue;
+        o.x = c.x; o.y = c.y; o.z = c.z;
+        o.xz = c.xz; o.xy = c.xy; o.zy = c.zy;
+        o.dist = c.dist;
+      }
+      medium.x = snapCurr.cam.x;
+      medium.y = snapCurr.cam.y;
+      medium.z = snapCurr.cam.z;
+      medium.xz = snapCurr.cam.xz;
+      medium.zy = snapCurr.cam.zy;
+    };
+
+    const frameBody = () => {
       if (!this.mon) {
         if (!flag2) {
           medium.d(this.rd);
@@ -1338,45 +1449,47 @@ export class F51 {
               }
             }
           }
-          if (xtgraphics.level < 6) {
-            for (let k5 = 0; k5 < l; ++k5) {
-              for (let i5 = 0; i5 < this.maxmo; ++i5) {
-                if (ai2[i5] !== ai[k5]) {
-                  aconto2[ai[k5]].tryexp(aconto2[ai2[i5]]);
-                  if (aconto2[ai2[i5]].fire) {
-                    if (i5 === 0) {
-                      usercraft.lasercolid(aconto2[ai[k5]]);
-                    }
-                    else {
-                      if (ai3[i5] === 0) {
-                        acraft[i5].lasercolid(aconto2[ai[k5]]);
+          if (!medium.interpolating) {
+            if (xtgraphics.level < 6) {
+              for (let k5 = 0; k5 < l; ++k5) {
+                for (let i5 = 0; i5 < this.maxmo; ++i5) {
+                  if (ai2[i5] !== ai[k5]) {
+                    aconto2[ai[k5]].tryexp(aconto2[ai2[i5]]);
+                    if (aconto2[ai2[i5]].fire) {
+                      if (i5 === 0) {
+                        usercraft.lasercolid(aconto2[ai[k5]]);
                       }
-                      if (ai3[i5] === 1) {
-                        atank[i5].lasercolid(aconto2[ai[k5]]);
+                      else {
+                        if (ai3[i5] === 0) {
+                          acraft[i5].lasercolid(aconto2[ai[k5]]);
+                        }
+                        if (ai3[i5] === 1) {
+                          atank[i5].lasercolid(aconto2[ai[k5]]);
+                        }
                       }
                     }
                   }
                 }
               }
             }
-          }
-          else {
-            for (let i6 = l - 1; i6 >= 0; --i6) {
-              for (let j6 = 0; j6 < this.maxmo; ++j6) {
-                if (ai2[j6] !== ai[i6]) {
-                  if (xtgraphics.level !== 15 || j6 !== 1) {
-                    aconto2[ai[i6]].tryexp(aconto2[ai2[j6]]);
-                  }
-                  if (aconto2[ai2[j6]].fire) {
-                    if (j6 === 0) {
-                      usercraft.lasercolid(aconto2[ai[i6]]);
+            else {
+              for (let i6 = l - 1; i6 >= 0; --i6) {
+                for (let j6 = 0; j6 < this.maxmo; ++j6) {
+                  if (ai2[j6] !== ai[i6]) {
+                    if (xtgraphics.level !== 15 || j6 !== 1) {
+                      aconto2[ai[i6]].tryexp(aconto2[ai2[j6]]);
                     }
-                    else {
-                      if (ai3[j6] === 0) {
-                        acraft[j6].lasercolid(aconto2[ai[i6]]);
+                    if (aconto2[ai2[j6]].fire) {
+                      if (j6 === 0) {
+                        usercraft.lasercolid(aconto2[ai[i6]]);
                       }
-                      if (ai3[j6] === 1) {
-                        atank[j6].lasercolid(aconto2[ai[i6]]);
+                      else {
+                        if (ai3[j6] === 0) {
+                          acraft[j6].lasercolid(aconto2[ai[i6]]);
+                        }
+                        if (ai3[j6] === 1) {
+                          atank[j6].lasercolid(aconto2[ai[i6]]);
+                        }
                       }
                     }
                   }
@@ -1387,43 +1500,49 @@ export class F51 {
           for (let j7 = 1; j7 < this.maxmo; ++j7) {
             if (ai3[j7] === 0) {
               acraft[j7].dosmokes(this.rd, aconto2[ai2[j7]]);
-              acraft[j7].preform(aconto2[ai2[j7]], aconto2, ai, l, ai2[0], k);
-              if (aconto2[ai2[j7]].exp) {
-                if (!this.nosound) {
-                  this.exp.setFramePosition(0);
-                  this.exp.start();
+              if (!medium.interpolating) {
+                acraft[j7].preform(aconto2[ai2[j7]], aconto2, ai, l, ai2[0], k);
+                if (aconto2[ai2[j7]].exp) {
+                  if (!this.nosound) {
+                    this.exp.setFramePosition(0);
+                    this.exp.start();
+                  }
+                  ai3[j7] = -1;
                 }
-                ai3[j7] = -1;
-              }
-              if (aconto2[ai2[j7]].hit && !this.nosound && this.frags === 0) {
-                this.hitl.setFramePosition(0);
-                this.hitl.start();
-                if (this.sosun) {
-                  this.frags = 3;
+                if (aconto2[ai2[j7]].hit && !this.nosound && this.frags === 0) {
+                  this.hitl.setFramePosition(0);
+                  this.hitl.start();
+                  if (this.sosun) {
+                    this.frags = 3;
+                  }
                 }
               }
             }
             if (ai3[j7] === 1) {
               atank[j7].dosmokes(this.rd, aconto2[ai2[j7]]);
-              atank[j7].preform(aconto2[ai2[j7]], aconto2, ai2[0], k);
-              if (aconto2[ai2[j7]].exp) {
-                if (!this.nosound) {
-                  this.exp.setFramePosition(0);
-                  this.exp.start();
+              if (!medium.interpolating) {
+                atank[j7].preform(aconto2[ai2[j7]], aconto2, ai2[0], k);
+                if (aconto2[ai2[j7]].exp) {
+                  if (!this.nosound) {
+                    this.exp.setFramePosition(0);
+                    this.exp.start();
+                  }
+                  ai3[j7] = -1;
                 }
-                ai3[j7] = -1;
-              }
-              if (aconto2[ai2[j7]].hit && !this.nosound && this.frags === 0) {
-                this.hitl.setFramePosition(0);
-                this.hitl.start();
-                if (this.sosun) {
-                  this.frags = 3;
+                if (aconto2[ai2[j7]].hit && !this.nosound && this.frags === 0) {
+                  this.hitl.setFramePosition(0);
+                  this.hitl.start();
+                  if (this.sosun) {
+                    this.frags = 3;
+                  }
                 }
               }
             }
           }
           usercraft.dosmokes(this.rd, aconto2[ai2[0]]);
-          usercraft.preform(this.u, aconto2[ai2[0]], aconto2, ai2, this.maxmo);
+          if (!medium.interpolating) {
+            usercraft.preform(this.u, aconto2[ai2[0]], aconto2, ai2, this.maxmo);
+          }
           let k6 = 0;
           if (this.tab) {
             k6 = xtgraphics.cl;
@@ -1431,83 +1550,87 @@ export class F51 {
           else if (this.view !== 4 && this.view !== 5) {
             xtgraphics.dtrakers(this.rd, ai3, ai2, this.maxmo, aconto2, usercraft, this.u);
           }
-          if (this.view === 0) {
-            medium.behinde(aconto2[ai2[k6]]);
-          }
-          if (this.view === 1) {
-            medium.right(aconto2[ai2[k6]]);
-          }
-          if (this.view === 2) {
-            medium.infront(aconto2[ai2[k6]]);
-          }
-          if (this.view === 3) {
-            medium.left(aconto2[ai2[k6]]);
-          }
-          if (this.view === 4) {
-            medium.around(aconto2[ai2[k6]], 800);
-          }
-          if (this.view === 5) {
-            medium.watch(aconto2[ai2[k6]]);
-          }
-          else if (medium.td) {
-            medium.td = false;
-          }
-          if (aconto2[ai2[0]].exp) {
-            let k7 = 0;
-            for (let l6 = 0; l6 < aconto2[ai2[0]].npl; ++l6) {
-              if (aconto2[ai2[0]].p[l6].exp === 7) {
-                ++k7;
-              }
+          if (!medium.interpolating) {
+            if (this.view === 0) {
+              medium.behinde(aconto2[ai2[k6]]);
             }
-            if (k7 === aconto2[ai2[0]].npl) {
-              flag2 = true;
-              xtgraphics.dest[ai2[0]] = true;
-              if (xtgraphics.alldest()) {
-                xtgraphics.fase = 2;
-                xtgraphics.drawovimg(this.offImage);
-              }
-              else {
-                xtgraphics.fase = 1;
-                xtgraphics.drawefimg(this.offImage);
-              }
+            if (this.view === 1) {
+              medium.right(aconto2[ai2[k6]]);
             }
-            if (this.u.space) {
-              this.u.space = false;
+            if (this.view === 2) {
+              medium.infront(aconto2[ai2[k6]]);
+            }
+            if (this.view === 3) {
+              medium.left(aconto2[ai2[k6]]);
+            }
+            if (this.view === 4) {
+              medium.around(aconto2[ai2[k6]], 800);
+            }
+            if (this.view === 5) {
+              medium.watch(aconto2[ai2[k6]]);
+            }
+            else if (medium.td) {
+              medium.td = false;
             }
           }
-          else {
-            if (xtgraphics.mcomp) {
-              if (this.u.space) {
-                if (xtgraphics.level !== 15) {
-                  xtgraphics.fase = -4;
-                  const xtGraphics = xtgraphics;
-                  ++xtGraphics.level;
+          if (!medium.interpolating) {
+            if (aconto2[ai2[0]].exp) {
+              let k7 = 0;
+              for (let l6 = 0; l6 < aconto2[ai2[0]].npl; ++l6) {
+                if (aconto2[ai2[0]].p[l6].exp === 7) {
+                  ++k7;
+                }
+              }
+              if (k7 === aconto2[ai2[0]].npl) {
+                flag2 = true;
+                xtgraphics.dest[ai2[0]] = true;
+                if (xtgraphics.alldest()) {
+                  xtgraphics.fase = 2;
+                  xtgraphics.drawovimg(this.offImage);
                 }
                 else {
-                  xtgraphics.fase = 4;
-                  xtgraphics.oldfase = 7;
+                  xtgraphics.fase = 1;
+                  xtgraphics.drawefimg(this.offImage);
                 }
-                flag2 = true;
+              }
+              if (this.u.space) {
                 this.u.space = false;
               }
             }
-            else if (this.u.space) {
-              flag2 = true;
-              xtgraphics.drawpimg(this.offImage);
-              xtgraphics.fase = 3;
-              this.u.space = false;
-              xtgraphics.select = 0;
-            }
-            let l7 = 0;
-            for (let i7 = k; i7 < k + 13; ++i7) {
-              if (aconto2[i7].exp) {
-                ++l7;
+            else {
+              if (xtgraphics.mcomp) {
+                if (this.u.space) {
+                  if (xtgraphics.level !== 15) {
+                    xtgraphics.fase = -4;
+                    const xtGraphics = xtgraphics;
+                    ++xtGraphics.level;
+                  }
+                  else {
+                    xtgraphics.fase = 4;
+                    xtgraphics.oldfase = 7;
+                  }
+                  flag2 = true;
+                  this.u.space = false;
+                }
               }
-            }
-            if (l7 === 13) {
-              flag2 = true;
-              xtgraphics.drawovimg(this.offImage);
-              xtgraphics.fase = 2;
+              else if (this.u.space) {
+                flag2 = true;
+                xtgraphics.drawpimg(this.offImage);
+                xtgraphics.fase = 3;
+                this.u.space = false;
+                xtgraphics.select = 0;
+              }
+              let l7 = 0;
+              for (let i7 = k; i7 < k + 13; ++i7) {
+                if (aconto2[i7].exp) {
+                  ++l7;
+                }
+              }
+              if (l7 === 13) {
+                flag2 = true;
+                xtgraphics.drawovimg(this.offImage);
+                xtgraphics.fase = 2;
+              }
             }
           }
         }
@@ -1550,115 +1673,155 @@ export class F51 {
                 }
               }
             }
-            medium.around(aconto2[k + 4], 6000);
-            if (this.u.space) {
-              xtgraphics.drawl(this.rd, this.offImage);
+            if (!medium.interpolating) {
+              medium.around(aconto2[k + 4], 6000);
+              if (this.u.space) {
+                xtgraphics.drawl(this.rd, this.offImage);
+              }
             }
           }
           xtgraphics.denter(this.rd, k, aconto2, usercraft, this.u);
-          if (xtgraphics.fase === -5 && this.u.space) {
-            if (xtgraphics.select === 0) {
-              this.loadrots(aconto2, false);
-              for (let i10 = k; i10 < k + 13; ++i10) {
-                aconto2[i10].out = false;
+          if (!medium.interpolating) {
+            if (xtgraphics.fase === -5 && this.u.space) {
+              if (xtgraphics.select === 0) {
+                this.loadrots(aconto2, false);
+                for (let i10 = k; i10 < k + 13; ++i10) {
+                  aconto2[i10].out = false;
+                }
+                xtgraphics.reset();
+                xtgraphics.fase = -4;
               }
-              xtgraphics.reset();
-              xtgraphics.fase = -4;
+              if (xtgraphics.select === 1 && xtgraphics.sgame === 1) {
+                this.loadrots(aconto2, false);
+                xtgraphics.reset();
+                this.loadsaved(aconto2, xtgraphics, k);
+                xtgraphics.fase = -4;
+              }
+              if (xtgraphics.select === 4) {
+                this.moner = "Exiting game...";
+                this.mon = true;
+              }
+              this.u.space = false;
             }
-            if (xtgraphics.select === 1 && xtgraphics.sgame === 1) {
-              this.loadrots(aconto2, false);
-              xtgraphics.reset();
-              this.loadsaved(aconto2, xtgraphics, k);
-              xtgraphics.fase = -4;
-            }
-            if (xtgraphics.select === 4) {
-              this.moner = "Exiting game...";
-              this.mon = true;
-            }
-            this.u.space = false;
-          }
-          if (xtgraphics.fase === 4) {}
-          if (xtgraphics.fase === -33) {
-            if (xtgraphics.frst && xtgraphics.select === 0) {
-              this.savegame(aconto2, xtgraphics, k);
-            }
-            else if (!xtgraphics.frst) {
-              xtgraphics.frst = true;
-            }
-            while (i3 !== 7) {
+            if (xtgraphics.fase === 4) {}
+            if (xtgraphics.fase === -33) {
+              if (xtgraphics.frst && xtgraphics.select === 0) {
+                this.savegame(aconto2, xtgraphics, k);
+              }
+              else if (!xtgraphics.frst) {
+                xtgraphics.frst = true;
+              }
+              while (i3 !== 7) {
+                if (xtgraphics.goodsun) {
+                  this.nounif = true;
+                }
+                this.mtrak[i3] = this.getSound("music/" + i3 + ".wav");
+                this.loadet[i3] = true;
+                ++i3;
+              }
               if (xtgraphics.goodsun) {
-                this.nounif = true;
+                xtgraphics.goodsun = false;
               }
-              this.mtrak[i3] = this.getSound("music/" + i3 + ".wav");
-              this.loadet[i3] = true;
-              ++i3;
+              this.loadmovers(ai2, ai3, aconto2, acraft, atank, usercraft, xtgraphics);
+              this.nounif = false;
+              xtgraphics.fase = -2;
             }
-            if (xtgraphics.goodsun) {
-              xtgraphics.goodsun = false;
+            if (xtgraphics.fase === -3) {
+              xtgraphics.fase = -33;
             }
-            this.loadmovers(ai2, ai3, aconto2, acraft, atank, usercraft, xtgraphics);
-            this.nounif = false;
-            xtgraphics.fase = -2;
-          }
-          if (xtgraphics.fase === -3) {
-            xtgraphics.fase = -33;
-          }
-          if (xtgraphics.fase === 0 && this.u.space) {
-            if (!xtgraphics.dest[xtgraphics.selected]) {
-              this.setmover(ai2, aconto2, usercraft, xtgraphics);
-              flag2 = false;
-              this.view = 0;
+            if (xtgraphics.fase === 0 && this.u.space) {
+              if (!xtgraphics.dest[xtgraphics.selected]) {
+                this.setmover(ai2, aconto2, usercraft, xtgraphics);
+                flag2 = false;
+                this.view = 0;
+              }
+              this.u.space = false;
             }
-            this.u.space = false;
-          }
-          if (xtgraphics.fase === 2 && xtgraphics.sgame === 1 && !xtgraphics.alldest()) {
-            this.set0();
-            xtgraphics.sgame = 0;
-          }
-          if (xtgraphics.fase === 3 && this.u.space) {
-            if (xtgraphics.select === 0) {
-              flag2 = false;
+            if (xtgraphics.fase === 2 && xtgraphics.sgame === 1 && !xtgraphics.alldest()) {
+              this.set0();
+              xtgraphics.sgame = 0;
             }
-            this.u.space = false;
-          }
-          if (xtgraphics.fase === -8) {
-            if (xtgraphics.sgame === -1) {
-              this.getslevel(xtgraphics);
+            if (xtgraphics.fase === 3 && this.u.space) {
+              if (xtgraphics.select === 0) {
+                flag2 = false;
+              }
+              this.u.space = false;
             }
-            if (xtgraphics.cnty === 351) {
-              xtgraphics.drawop(this.rd, this.offImage);
-              xtgraphics.cnty = 352;
+            if (xtgraphics.fase === -8) {
+              if (xtgraphics.sgame === -1) {
+                this.getslevel(xtgraphics);
+              }
+              if (xtgraphics.cnty === 351) {
+                xtgraphics.drawop(this.rd, this.offImage);
+                xtgraphics.cnty = 352;
+              }
             }
-          }
-          if (xtgraphics.fase === 7 && this.u.space) {
-            this.moner = "One moment...";
-            this.mon = true;
-            this.u.space = false;
+            if (xtgraphics.fase === 7 && this.u.space) {
+              this.moner = "One moment...";
+              this.mon = true;
+              this.u.space = false;
+            }
           }
         }
       }
       else {
-        if (this.u.space) {
+        if (this.u.space && !medium.interpolating) {
           this.u.space = false;
         }
         this.rd.setColor(colorOf(223, 223, 223));
         this.rd.fillRect(0, 0, 500, 360);
         xtgraphics.drawcs(this.rd, 170, this.moner, 0, 0, 0, false);
-        if (this.moner === "Exiting game...") {
-          this.repaint();
-          this.stop();
-          return;
-        }
-        if (this.moner === "One moment...") {
-          this.repaint();
-          try {
-            this.open("winner/index.html");
+        if (!medium.interpolating) {
+          if (this.moner === "Exiting game...") {
+            this.repaint();
+            this.stop();
+            return true;
           }
-          catch (ex) {}
-          this.stop();
-          return;
+          if (this.moner === "One moment...") {
+            this.repaint();
+            try {
+              this.open("winner/index.html");
+            }
+            catch (ex) {}
+            this.stop();
+            return true;
+          }
         }
       }
+      return false;
+    };
+
+    while (this.gamer) {
+      let date2 = new Date();
+      const l4 = Date.now();
+      if (this.smooth) {
+        capture(snapPrev);
+        startRandomRecording();
+        // The tick computes and mutates, but does not paint: the interpolated
+        // passes below redraw the same scene blended from snapPrev to snapCurr
+        // across this whole window, so a visible tick draw would show state N
+        // and then be replaced by state N-1 a few milliseconds later. One tick
+        // of display latency is the price, and it is what the sibling port
+        // settled on too ("when interpolating, NO tick draws").
+        this.rd.mute = true;
+      }
+
+      this._ticks++;
+      if (!this.smooth) this._draws++;
+      if (frameBody()) {
+        if (this.smooth) {
+          stopRandom();
+          this.rd.mute = false;
+        }
+        return;
+      }
+
+      if (this.smooth) {
+        stopRandom();
+        this.rd.mute = false;
+        capture(snapCurr);
+      }
+
       this.repaint();
       if (!this.mon) {
         this.playsounds(usercraft, aconto2[ai2[0]], flag2, xtgraphics);
@@ -1733,9 +1896,61 @@ export class F51 {
       }
       if (!this.gamer) break;
       const l10 = Date.now();
+      const tickInterval = Math.round(f);
+      // The tick painted nothing (see the mute above), so this window MUST
+      // produce at least one frame. On a display slower than the tick rate the
+      // do-loop below can exit without ever drawing, which would show a stale
+      // frame for the whole tick.
+      let drew = false;
       do {
         await new Promise((r) => raf(r));
+        if (!this.gamer) break;
+        // `_forceInterp` (a test seam, set by port/tools/smoke.mjs) runs a
+        // fixed number of interpolated passes per tick instead of however many
+        // the display happens to allow. It is how the guards are checked: with
+        // every draw-time mutation properly guarded, N extra passes must leave
+        // the game state advancing at exactly the same per-tick rate. Without
+        // the guards it advances N+1 times too fast, which is the whole bug
+        // class this feature is prone to.
+        if (this.smooth && this._forceInterp > 0) {
+          for (let n = 0; n < this._forceInterp; n++) {
+            applyBlend((n + 1) / (this._forceInterp + 1));
+            this._draws++;
+            medium.interpolating = true;
+            startRandomReplay();
+            frameBody();
+            stopRandom();
+            medium.interpolating = false;
+            restoreCurr();
+          }
+        }
+        if (this.smooth && this._forceInterp === 0 && Date.now() - l10 < l9) {
+          const elapsed = Date.now() - l4;
+          const t = Math.min(1.0, Math.max(0.0, elapsed / tickInterval));
+          applyBlend(t);
+          this._draws++;
+          drew = true;
+          medium.interpolating = true;
+          startRandomReplay();
+          frameBody();
+          stopRandom();
+          medium.interpolating = false;
+          restoreCurr();
+        }
       } while (this.gamer && Date.now() - l10 < l9);
+
+      if (this.smooth && !drew && this.gamer && this._forceInterp === 0) {
+        // t = 1: the tick's own state, which is what an unsmoothed frame would
+        // have shown anyway.
+        applyBlend(1);
+        this._draws++;
+        medium.interpolating = true;
+        startRandomReplay();
+        frameBody();
+        stopRandom();
+        medium.interpolating = false;
+        restoreCurr();
+      }
     }
   }
 }
