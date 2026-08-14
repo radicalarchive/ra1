@@ -196,3 +196,35 @@ test('getcos wraps negative angles (from probe)', () => {
   assert.strictEqual(sc.getcos(-720),  1.0);
   assert.strictEqual(sc.getcos(-1081), Math.fround(0.9998477));
 });
+
+// ---------------------------------------------------------------------------
+// Fractional angles — the smooth-motion path (not Java behaviour).
+//
+// Java's getsin/getcos index an int[] table, so an int argument must return the
+// table entry unchanged; every assertion above pins that. Smooth motion blends
+// headings and passes a FRACTIONAL angle, which the table cannot answer, so
+// these lerp between the two neighbouring entries.
+//
+// This test exists because that path shipped with `fr` not imported: nothing
+// called it with a non-integer, so 129 tests and a headless smoke run of the
+// menus all stayed green while the game threw ReferenceError the moment an
+// object turned on screen.
+// ---------------------------------------------------------------------------
+test('fractional angles lerp between table entries (smooth motion)', () => {
+  const cs = new SinCos();
+
+  // Exactly halfway between two entries is the mean of them.
+  assert.strictEqual(cs.getsin(30.5), Math.fround((cs.getsin(30) + cs.getsin(31)) / 2));
+  assert.strictEqual(cs.getcos(30.5), Math.fround((cs.getcos(30) + cs.getcos(31)) / 2));
+
+  // Monotonic across an entry, and never equal to either endpoint.
+  const a = cs.getsin(10), q = cs.getsin(10.25), b = cs.getsin(11);
+  assert.ok(q > a && q < b, `${a} < ${q} < ${b}`);
+
+  // 359.5 wraps to the 359 -> 0 pair rather than reading past the end.
+  assert.strictEqual(cs.getsin(359.5), Math.fround((cs.getsin(359) + cs.getsin(0)) / 2));
+  assert.strictEqual(cs.getcos(359.5), Math.fround((cs.getcos(359) + cs.getcos(0)) / 2));
+
+  // Negative fractional angles normalise the same way integers do.
+  assert.strictEqual(cs.getsin(-90.5), cs.getsin(269.5));
+});

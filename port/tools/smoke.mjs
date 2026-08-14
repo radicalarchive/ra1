@@ -59,6 +59,7 @@ await new Promise((r) => (ws.onopen = r));
 let nextId = 1;
 const pending = new Map();
 const logs = [];
+const failures = [];
 ws.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
   if (msg.id && pending.has(msg.id)) {
@@ -66,11 +67,19 @@ ws.onmessage = (ev) => {
     pending.delete(msg.id);
   }
   if (msg.method === 'Runtime.consoleAPICalled') {
-    logs.push(msg.params.args.map((a) => a.value ?? a.description ?? '').join(' '));
+    const line = msg.params.args.map((a) => a.value ?? a.description ?? '').join(' ');
+    logs.push(line);
+    // The harness page reports thrown errors and rejected promises through
+    // console. Anything that looks like one is a FAILURE, not a log line:
+    // grepping this output for the interesting numbers and missing an
+    // exception in among it is exactly how a broken build gets called green.
+    if (/^(ERROR|REJECT|BOOT THREW)/.test(line)) failures.push(line);
   }
   if (msg.method === 'Runtime.exceptionThrown') {
     const d = msg.params.exceptionDetails;
-    logs.push('PAGE ERROR ' + (d.exception?.description || d.text));
+    const line = 'PAGE ERROR ' + (d.exception?.description || d.text);
+    logs.push(line);
+    failures.push(line);
   }
 };
 const send = (method, params = {}) =>
@@ -178,6 +187,14 @@ console.log(pixels.result.value);
 console.log('--- screenshot ---');
 console.log(OUT);
 
+console.log('--- result ---');
+if (failures.length > 0) {
+  console.log(`FAILED: ${failures.length} page error(s)`);
+  for (const f of failures.slice(0, 10)) console.log('  ' + f);
+} else {
+  console.log('no page errors');
+}
+
 ws.close();
 chrome.kill();
-process.exit(0);
+process.exit(failures.length > 0 ? 1 : 0);

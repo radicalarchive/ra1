@@ -19,7 +19,7 @@
 //   Both are pure int arithmetic (no float anywhere).  Neither matches the
 //   `+= (int)(` or `-= (int)(` pattern; no §2 sites exist in this file.
 
-import { floatArray } from './java.js';
+import { floatArray, fr } from './java.js';
 
 export class SinCos {
   constructor() {
