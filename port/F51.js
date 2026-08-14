@@ -765,14 +765,29 @@ export class F51 {
 
   // --- seams and life cycle -------------------------------------------------
 
-  async init(canvas) {
+  /**
+   * @param {HTMLCanvasElement} canvas
+   * @param {{scale?: number}} [opts] — `scale` 2 renders the same 500x360 game
+   *        coordinates onto a 1000x720 backing store. See Graphics2D.
+   */
+  async init(canvas, opts = {}) {
+    const scale = opts.scale || 1;
+    this.scale = scale;
+
     // 2. GRAPHICS: create the offscreen surface / Graphics2D over the canvas
     if (canvas) {
+      // The game's coordinates are fixed at 500x360; only the backing store
+      // grows. main.html sizes the element in CSS, so this changes sharpness,
+      // not layout.
+      if (canvas.width !== 500 * scale || canvas.height !== 360 * scale) {
+        canvas.width = 500 * scale;
+        canvas.height = 360 * scale;
+      }
       this.offImage = new JImage(canvas);
-      this.rd = this.offImage.getGraphics();
+      this.rd = this.offImage.getGraphics(scale);
     } else {
-      this.offImage = createImage(500, 360);
-      this.rd = this.offImage.getGraphics();
+      this.offImage = createImage(500 * scale, 360 * scale);
+      this.rd = this.offImage.getGraphics(scale);
     }
     this.rd.setFont("SansSerif", 1, 11);
     this.cookieDir();

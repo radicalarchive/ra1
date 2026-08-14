@@ -43,6 +43,38 @@
     z-index: 2;
   }
   #gesture p { text-align: center; letter-spacing: .04em; }
+  #gesture .panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+  #opts {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+    color: #8c99a8;
+  }
+  #opts label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    /* The panel itself is the click target that starts the game; a click on a
+       checkbox must not also start it. */
+  }
+  #opts .hint { color: #5d6874; }
+  #play {
+    letter-spacing: .04em;
+    border: 1px solid #4a5560;
+    background: #12171c;
+    color: #aeb9c6;
+    padding: 10px 26px;
+    font: inherit;
+    cursor: pointer;
+  }
+  #play:hover { background: #1b232a; }
   #error {
     position: fixed;
     inset: auto 0 0 0;
@@ -64,7 +96,24 @@
 <!-- Browsers refuse to start audio without a user gesture, and this game
      opens on a music track, so the first click both unlocks the AudioContext
      and gives the canvas keyboard focus. -->
-<div id="gesture"><p>RADICAL ACES<br><br>click to play</p></div>
+<div id="gesture">
+  <div class="panel">
+    <p>RADICAL ACES</p>
+    <div id="opts">
+      <label>
+        <input type="checkbox" id="opt-res">
+        2&times; resolution
+        <span class="hint">&mdash; crisper polygons and text</span>
+      </label>
+      <label>
+        <input type="checkbox" id="opt-smooth">
+        Smooth motion
+        <span class="hint">&mdash; interpolated frames, same game speed</span>
+      </label>
+    </div>
+    <button id="play">click to play</button>
+  </div>
+</div>
 
 <div id="error"></div>
 
@@ -83,11 +132,27 @@
   window.addEventListener('error', (e) => fail(e.error || e.message));
   window.addEventListener('unhandledrejection', (e) => fail(e.reason));
 
-  gesture.addEventListener('click', async () => {
+  // Options are remembered between sessions, and readable from the URL so a
+  // bug report can pin them: ?res=2&smooth=1.
+  const params = new URLSearchParams(location.search);
+  const stored = (k, d) => {
+    if (params.has(k)) return params.get(k) === '1' || params.get(k) === '2';
+    const v = localStorage.getItem('ra1:' + k);
+    return v === null ? d : v === '1';
+  };
+  const optRes = document.getElementById('opt-res');
+  const optSmooth = document.getElementById('opt-smooth');
+  optRes.checked = stored('res', false);
+  optSmooth.checked = stored('smooth', true);
+
+  document.getElementById('play').addEventListener('click', async () => {
+    localStorage.setItem('ra1:res', optRes.checked ? '1' : '0');
+    localStorage.setItem('ra1:smooth', optSmooth.checked ? '1' : '0');
+    const opts = { scale: optRes.checked ? 2 : 1, smooth: optSmooth.checked };
     gesture.remove();
     canvas.focus();
     try {
-      await boot(canvas);
+      await boot(canvas, opts);
     } catch (e) {
       fail(e);
     }

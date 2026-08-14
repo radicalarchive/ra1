@@ -33,7 +33,9 @@
 
   const canvas = document.getElementById('screen');
   try {
-    window.__game = await boot(canvas);
+    // SMOKE_OPTS in smoke.mjs sets these before navigation.
+    const opts = window.__opts || {};
+    window.__game = await boot(canvas, opts);
     log('boot() returned');
     // Report whether anything was actually drawn, so a black canvas is not
     // mistaken for a working boot.

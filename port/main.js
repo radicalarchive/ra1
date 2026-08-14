@@ -28,20 +28,22 @@ import { F51 } from './F51.js';
 import { awtCode, EVENT_UP, EVENT_DOWN, EVENT_LEFT, EVENT_RIGHT } from './input.js';
 
 /**
- * Boots the game onto the provided 500x360 canvas.
+ * Boots the game onto the provided canvas.
  *
  * @param {HTMLCanvasElement} canvas
+ * @param {{scale?: number, smooth?: boolean}} [opts]
+ *        scale  — 2 renders the 500x360 game coordinates onto a 1000x720
+ *                 backing store: sharper geometry and text, same layout.
+ *        smooth — draw interpolated frames between physics ticks. The
+ *                 simulation rate is unchanged either way, so this does not
+ *                 alter how the game plays.
  * @returns {Promise<{ f: F51, stop: () => void }>}
  */
-export async function boot(canvas) {
-  // 1. Validate canvas dimensions.
-  // The game logic strictly assumes a 500x360 framebuffer. CSS handles display
-  // scaling (pixelated nearest-neighbor); backing store must stay exactly 500x360.
-  if (!canvas || canvas.width !== 500 || canvas.height !== 360) {
-    throw new Error(
-      `Canvas must be 500x360 (received ${canvas ? `${canvas.width}x${canvas.height}` : 'null'})`
-    );
-  }
+export async function boot(canvas, opts = {}) {
+  // 1. Validate the canvas.
+  // The game's coordinates are always 500x360; F51.init resizes the backing
+  // store to 500*scale x 360*scale, and CSS handles the display size.
+  if (!canvas) throw new Error('boot() needs a canvas');
 
   // 2. Unlock WebAudio.
   // Browsers block AudioContext creation/playback until a user gesture has occurred.
@@ -52,7 +54,7 @@ export async function boot(canvas) {
   // Mirrors Java main(): new F51() -> f.init(canvas) -> f.start().
   // F51.init preloads VFS assets and creates Graphics2D; f.start begins the rAF loop.
   const f = new F51();
-  await f.init(canvas);
+  await f.init(canvas, opts);
   f.start();
 
   // 4. Wire the AWT 1.0 event model onto DOM events.
@@ -113,6 +115,8 @@ export async function boot(canvas) {
   // The game's mouseDown handler only uses this as "a click happened" to dismiss
   // "Click here to Start/Continue" prompts and activate u.space when u.canclick is set.
   function onMouseDown(e) {
+    // Game pixels, not CSS pixels, and not backing-store pixels either: the
+    // game's coordinate space is 500x360 whatever the scale option is.
     const rect = canvas.getBoundingClientRect();
     const x = rect.width > 0 ? Math.floor((e.clientX - rect.left) * (500 / rect.width)) : 0;
     const y = rect.height > 0 ? Math.floor((e.clientY - rect.top) * (360 / rect.height)) : 0;

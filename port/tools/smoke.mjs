@@ -82,6 +82,12 @@ const send = (method, params = {}) =>
 
 await send('Runtime.enable');
 await send('Page.enable');
+// SMOKE_OPTS='{"scale":2}' reaches boot() through the harness page.
+if (process.env.SMOKE_OPTS) {
+  await send('Page.addScriptToEvaluateOnNewDocument', {
+    source: `window.__opts = ${process.env.SMOKE_OPTS};`,
+  });
+}
 await send('Page.navigate', { url: URL_ });
 await sleep(1500);
 // main.html gates the boot behind a click (WebAudio needs a gesture); the

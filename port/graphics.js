@@ -42,7 +42,16 @@ function cssFont(name, style, size) {
 }
 
 export class Graphics2D {
-  constructor(ctx) {
+  /**
+   * `scale` renders the same 500x360 game coordinates onto a backing store
+   * `scale` times larger. Every coordinate the game computes is unchanged —
+   * only the rasterisation is finer, so polygons, lines and menu text come out
+   * crisp. It cannot make the pixel effects sharper: those walk a 500x360
+   * int[] by construction (see grabPixels).
+   */
+  constructor(ctx, scale = 1) {
+    this.scale = scale;
+    if (scale !== 1) ctx.setTransform(scale, 0, 0, scale, 0, 0);
     this.ctx = ctx;
     this.ctx.textBaseline = 'alphabetic';   // Java's drawString y IS the baseline
     this.ctx.font = cssFont('SansSerif', BOLD, 11);
@@ -168,9 +177,10 @@ export class JImage {
     this._g = null;
   }
 
-  getGraphics() {
+  getGraphics(scale = 1) {
     if (this._g === null) {
-      this._g = new Graphics2D(this.canvas.getContext('2d', { willReadFrequently: true }));
+      this._g = new Graphics2D(
+        this.canvas.getContext('2d', { willReadFrequently: true }), scale);
     }
     return this._g;
   }
@@ -221,12 +231,18 @@ export function imageFromPixels(w, h, pix) {
 export function grabPixels(img, pix, w = 500, h = 360) {
   const src = img.canvas !== undefined ? img.canvas : img;
   let ctx;
-  if (src.getContext) {
+  if (src.getContext && src.width === w && src.height === h) {
     ctx = src.getContext('2d', { willReadFrequently: true });
   } else {
+    // Either a bare image, or the screen at 2x: the game's pixel effects are
+    // written against a 500x360 int[], so a larger surface is RESAMPLED down
+    // to that rather than read as its top-left corner. The effect then draws
+    // back through the scaled context and lands upscaled, which is the
+    // documented compromise for `?res=2` — geometry and text gain resolution,
+    // the per-pixel effects do not.
     const c = newCanvas(w, h);
     ctx = c.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(src, 0, 0);
+    ctx.drawImage(src, 0, 0, src.width || w, src.height || h, 0, 0, w, h);
   }
   const buf = ctx.getImageData(0, 0, w, h).data;
   for (let i = 0, j = 0; i < w * h; i++, j += 4) {
