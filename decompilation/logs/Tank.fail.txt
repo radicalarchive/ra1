@@ -1,0 +1,248 @@
+✔ every model file in the distribution parses identically to Java (14.661772ms)
+✔ getvalue throws exactly where Java throws (0.214095ms)
+✔ getpy wraps at int32 exactly as Java does (0.160904ms)
+✔ xs / ys clamp j and wrap, from the probe (0.159251ms)
+✔ reset clears rotation and hit state (0.134464ms)
+✔ Craft constructor and default fields match Java probe (1.504139ms)
+✔ getpy, getcpy, getepy wrap at int32 exactly as Java does (from probe) (1.318748ms)
+✔ nearst and myway match Java probe (1.02255ms)
+✔ reset updates craft parameters correctly (from probe) (0.764503ms)
+✔ lasercolid detects laser hits and damages ContO (from probe) (0.468734ms)
+✔ dl and dosmokes state transitions (from probe) (0.449118ms)
+✖ preform Scenario A: Climbing in air (u.up = true, Case A compound assignments) (3.021072ms)
+✔ preform Scenario B: Diving with down key and high speed (Case B lift sub) (1.387459ms)
+✔ preform Scenario C: Banking left and right (Probe lines 553-612) (1.434848ms)
+✔ preform Scenario D: Boundary clamping (Probe lines 613-615) (1.538383ms)
+✖ preform Scenario E: Ground contact / crash (Probe lines 616-658) (1.681774ms)
+✔ preform Scenario F: Laser firing (Probe lines 659-664) (1.131355ms)
+✔ preform Scenario G: Laser homing update (Probe lines 665-670) (1.396867ms)
+✔ constructor defaults match the real class (1.598157ms)
+✔ ys clamps j and wraps at int32 (0.209986ms)
+✔ infront (infront_a) tracks Java for eight steps (1.26613ms)
+✔ infront (infront_b) tracks Java for eight steps (0.442526ms)
+✔ behinde (behinde_a) tracks Java for eight steps (0.334752ms)
+✔ behinde (behinde_b) tracks Java for eight steps (0.279828ms)
+✔ left (left) tracks Java for eight steps (0.341855ms)
+✔ right (right) tracks Java for eight steps (0.287642ms)
+✔ watch (watch) tracks Java for eight steps (0.923954ms)
+✔ infront (infront_neg) tracks Java for eight steps (0.368946ms)
+✔ behinde (behinde_neg) tracks Java for eight steps (0.27062ms)
+✔ left (left_neg) tracks Java for eight steps (0.232949ms)
+✔ right (right_neg) tracks Java for eight steps (0.184679ms)
+✔ watch (watch_neg) tracks Java for eight steps (0.373154ms)
+✔ infront (infront_ab) tracks Java for eight steps (0.201881ms)
+✔ behinde (behinde_ab) tracks Java for eight steps (0.211379ms)
+✔ left (left_ab) tracks Java for eight steps (0.145665ms)
+✔ right (right_ab) tracks Java for eight steps (0.176032ms)
+✔ infront (infront_cv) tracks Java for eight steps (0.155493ms)
+✔ behinde (behinde_cv) tracks Java for eight steps (0.190329ms)
+✔ left (left_cv) tracks Java for eight steps (0.213453ms)
+✔ right (right_cv) tracks Java for eight steps (0.180781ms)
+✔ around(3000) tracks Java for eight steps (0.311047ms)
+✔ around(6000) tracks Java for eight steps (0.23848ms)
+✔ d() clamps zy and y, recomputes ground, decrements jumping (0.370639ms)
+✔ constructor: n, ox, oy, oz, c fields (from probe) (1.272592ms)
+✔ constructor: deltaf_after_ctor = 3.5538489E10 (from probe) (0.281121ms)
+✔ constructor: projf_after_ctor = 1.0 (from probe) (0.193786ms)
+✔ constructor: sr=255, sg=220, exp=0 (from probe) (0.770153ms)
+✔ loadprojf: projf = 3.5317494E10 (from probe) (0.251414ms)
+✔ xs(3000, 2000) = 800 (from probe) (0.184528ms)
+✔ xs(-500, 800) = -125 (from probe) (0.13782ms)
+✔ xs(200, 5) = -1750 — j<10 clamped to 10 (from probe) (0.125477ms)
+✔ xs(200, -100) = -1750 — negative j clamped to 10 (from probe) (0.281702ms)
+✔ xs(0, 0) = -9750 — j==0 clamped to 10 (from probe) (0.295037ms)
+✔ ys(3000, 2000) = 720 (from probe) (0.203354ms)
+✔ ys(-500, 800) = -175 (from probe) (0.11672ms)
+✔ ys(200, 5) = 2150 — j<10 clamped to 10 (from probe) (0.140034ms)
+✔ ys(200, -100) = 2150 — negative j clamped to 10 (from probe) (0.102553ms)
+✔ ys(0, 0) = -5850 — j==0 clamped to 10 (from probe) (0.103365ms)
+✔ spy(250, 0) = 0 — on-centre (from probe) (0.120077ms)
+✔ spy(0, 0) = 250 (from probe) (0.104717ms)
+✔ spy(1000, 1000) = 1250 (from probe) (0.098386ms)
+✔ spy(50000, 60000) = 42191 — int32 overflow, wrapped (from probe) (0.092003ms)
+✔ spy(-30000, -40000) = 0 — wrapped sum is negative, sqrt(neg)=NaN, trunc(NaN)=0 (from probe) (0.090411ms)
+✔ rot k=45: arrays rotated in place (from probe) (0.160603ms)
+✔ rot k=0 is a no-op: arrays unchanged (from probe) (0.093767ms)
+✔ d() exp=0 flag=false: av=4382, projf=2.89187738E10, exp=0 (from probe) (0.540501ms)
+✔ d() exp=0 flag=true: av=4233, projf=28754.979 (from probe) (0.154993ms)
+✔ s() exp=0 all oy>ground: exp unchanged (from probe: exp_after_s_allaboveground=0) (0.24355ms)
+✔ s() exp=0 all oy<ground: shadow drawn, exp unchanged (from probe: exp_after_s_belowground=0) (0.145845ms)
+✔ tsin and tcos arrays have length 360 (1.257744ms)
+✔ tsin table spot-checks — first five entries (from probe) (0.115658ms)
+✔ tsin table spot-checks — boundary angles (from probe) (0.144603ms)
+✔ tcos table spot-checks — first five entries (from probe) (0.114406ms)
+✔ tcos table spot-checks — boundary angles (from probe) (0.112482ms)
+✔ tsin/tcos mid-table entries at 45 and 135 (from probe) (0.105719ms)
+✔ getsin in-range inputs (from probe) (0.132681ms)
+✔ getcos in-range inputs (from probe) (0.136698ms)
+✔ getsin wraps angles >= 360 (from probe) (0.273857ms)
+✔ getcos wraps angles >= 360 (from probe) (0.278586ms)
+✔ getsin wraps negative angles (from probe) (0.165663ms)
+✔ getcos wraps negative angles (from probe) (0.097514ms)
+✔ Tank constructor and default fields match Java probe (1.427875ms)
+✔ getpy and getcpy wrap at int32 exactly as Java does (from probe) (1.264216ms)
+✔ reset updates tank parameters correctly (from probe) (0.224033ms)
+✔ lasercolid detects laser hits and damages ContO (from probe) (0.461841ms)
+✔ dl and dosmokes state transitions (from probe) (0.417739ms)
+✖ preform Scenario A: Left steering and Case A speed/5 compound assignment (Probe lines 68-202) (3.256146ms)
+✖ preform Scenario B: Right steering (Probe lines 203-337) (1.991499ms)
+✖ preform Scenario C: Boundary clamping (Probe lines 338-339) (1.115806ms)
+✔ preform Scenario D: Pitch/Roll normalisation (Probe lines 340-342) (1.460476ms)
+✔ preform Scenario E: Gravity behavior (Probe lines 343-345) (1.088635ms)
+✖ preform Scenario F: Laser firing (Probe lines 346-352) (1.110075ms)
+✖ preform Scenario G: Laser homing update (Probe lines 353-358) (0.896152ms)
+✔ preform Scenario H: Response / steering tracking (Probe lines 359-360) (0.852369ms)
+✔ readLines splits a real level file the way DataInputStream.readLine does (3.492722ms)
+✔ readLines is Latin-1, not UTF-8 (0.186262ms)
+✔ readZip inflates models.zrad, entries in stored order (40.868447ms)
+✔ readZip entry names match the objects/ models (14.337511ms)
+ℹ tests 98
+ℹ suites 0
+ℹ pass 91
+ℹ fail 7
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 126.168334
+
+✖ failing tests:
+
+test at Craft.test.js:316:1
+✖ preform Scenario A: Climbing in air (u.up = true, Case A compound assignments) (3.021072ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///home/evan/resources/ra1/port/Craft.test.js:365:10)
+      at Test.runInAsyncScope (node:async_hooks:211:14)
+      at Test.run (node:internal/test_runner/test:980:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:678:18)
+      at Test.postRun (node:internal/test_runner/test:1091:19)
+      at Test.run (node:internal/test_runner/test:1019:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:678:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual'
+  }
+
+test at Craft.test.js:676:1
+✖ preform Scenario E: Ground contact / crash (Probe lines 616-658) (1.681774ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///home/evan/resources/ra1/port/Craft.test.js:755:10)
+      at Test.runInAsyncScope (node:async_hooks:211:14)
+      at Test.run (node:internal/test_runner/test:980:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:678:18)
+      at Test.postRun (node:internal/test_runner/test:1091:19)
+      at Test.run (node:internal/test_runner/test:1019:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:678:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual'
+  }
+
+test at Tank.test.js:240:1
+✖ preform Scenario A: Left steering and Case A speed/5 compound assignment (Probe lines 68-202) (3.256146ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///home/evan/resources/ra1/port/Tank.test.js:285:10)
+      at Test.runInAsyncScope (node:async_hooks:211:14)
+      at Test.run (node:internal/test_runner/test:980:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:678:18)
+      at Test.postRun (node:internal/test_runner/test:1091:19)
+      at Test.run (node:internal/test_runner/test:1019:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:678:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual'
+  }
+
+test at Tank.test.js:415:1
+✖ preform Scenario B: Right steering (Probe lines 203-337) (1.991499ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///home/evan/resources/ra1/port/Tank.test.js:467:10)
+      at Test.runInAsyncScope (node:async_hooks:211:14)
+      at Test.run (node:internal/test_runner/test:980:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:678:18)
+      at Test.postRun (node:internal/test_runner/test:1091:19)
+      at Test.run (node:internal/test_runner/test:1019:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:678:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual'
+  }
+
+test at Tank.test.js:597:1
+✖ preform Scenario C: Boundary clamping (Probe lines 338-339) (1.115806ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  39997 !== 40000
+  
+      at TestContext.<anonymous> (file:///home/evan/resources/ra1/port/Tank.test.js:627:10)
+      at Test.runInAsyncScope (node:async_hooks:211:14)
+      at Test.run (node:internal/test_runner/test:980:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:678:18)
+      at Test.postRun (node:internal/test_runner/test:1091:19)
+      at Test.run (node:internal/test_runner/test:1019:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:678:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 39997,
+    expected: 40000,
+    operator: 'strictEqual'
+  }
+
+test at Tank.test.js:709:1
+✖ preform Scenario F: Laser firing (Probe lines 346-352) (1.110075ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  39980 !== 40000
+  
+      at TestContext.<anonymous> (file:///home/evan/resources/ra1/port/Tank.test.js:754:10)
+      at Test.runInAsyncScope (node:async_hooks:211:14)
+      at Test.run (node:internal/test_runner/test:980:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:678:18)
+      at Test.postRun (node:internal/test_runner/test:1091:19)
+      at Test.run (node:internal/test_runner/test:1019:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:678:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 39980,
+    expected: 40000,
+    operator: 'strictEqual'
+  }
+
+test at Tank.test.js:760:1
+✖ preform Scenario G: Laser homing update (Probe lines 353-358) (0.896152ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  5 !== 0
+  
+      at TestContext.<anonymous> (file:///home/evan/resources/ra1/port/Tank.test.js:806:10)
+      at Test.runInAsyncScope (node:async_hooks:211:14)
+      at Test.run (node:internal/test_runner/test:980:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:678:18)
+      at Test.postRun (node:internal/test_runner/test:1091:19)
+      at Test.run (node:internal/test_runner/test:1019:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:678:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 5,
+    expected: 0,
+    operator: 'strictEqual'
+  }

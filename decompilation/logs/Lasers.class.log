@@ -1,0 +1,158 @@
+=== agy_ra1 ===================================================
+phase   : class
+class   : Lasers
+writes  : /home/evan/resources/ra1/port/Lasers.js, /home/evan/resources/ra1/port/tools/LasersProbe.java and /home/evan/resources/ra1/port/Lasers.test.js
+model   : gemini-3.7-flash-medium   (effort high, timeout 45m)
+===============================================================
+### Files Created & Written
+
+1. [`port/Lasers.js`](file:///home/evan/resources/ra1/port/Lasers.js) — Line-by-line transpilation of [`Lasers.java`](file:///home/evan/resources/ra1/decompilation/java-src/Lasers.java) matching JS/WebGL port spec.
+2. [`port/tools/LasersProbe.java`](file:///home/evan/resources/ra1/port/tools/LasersProbe.java) — Java reflection probe driving the original `Lasers.class` from `ra1.jar`.
+3. [`port/Lasers.test.js`](file:///home/evan/resources/ra1/port/Lasers.test.js) — Node test suite asserting literal numbers recorded from the probe.
+4. Output log recorded at [`decompilation/logs/Lasers.probe.txt`](file:///home/evan/resources/ra1/decompilation/logs/Lasers.probe.txt).
+
+---
+
+### Compound-Assignment Audit (§2 & §2e)
+
+Three compound-assignment sites were identified in [`Lasers.java`](file:///home/evan/resources/ra1/decompilation/java-src/Lasers.java), all inside `dt()` when `l1 != 0`:
+
+#### Site 1 — `dt()` (Java line 91)
+```java
+ai[n4] += (int)(i - this.m.x + (Math.random() * 50.0 - 25.0));
+```
+- **Bytecode offsets & opcodes:**
+  ```
+  70: aload_2
+  71: iload 16
+  73: dup2
+  74: iaload
+  75: i2d                          // <-- Accumulator ai[l2] widened to double
+  76: iload 5
+  78: aload_0
+  79: getfield #1 (m:LMedium;)
+  82: getfield #9 (Medium.x:I)
+  85: isub
+  86: i2d                          // <-- (i - m.x) widened to double
+  87: invokestatic #12 (Math.random:()D)
+  90: ldc2_w 50.0d
+  93: dmul
+  94: ldc2_w 25.0d
+  97: dsub
+  98: dadd
+  99: dadd
+ 100: d2i                          // <-- ONE truncation at the end
+ 101: iastore
+  ```
+- **Classification:** **Case A** (implicit narrowing cast inserted by `javac`; accumulator widened to double before addition, single `d2i` truncation at the end).
+- **Correct JS:**
+  ```js
+  ai[n4] = trunc(ai[n4] + (i - this.m.x + (random() * 50.0 - 25.0)));
+  ```
+- **Mutation & Discriminating Test (§2e):**
+  - Input separating Case A from Case B: `accumulator = 10`, `rhs = -0.4`.
+  - Case A computes `trunc(10 + (-0.4)) = trunc(9.6) = 9`.
+  - Case B computes `10 + trunc(-0.4) = 10 + 0 = 10`.
+  - When mutated to Case B, the discriminator test fails (RED). Reverted to Case A (GREEN).
+
+#### Site 2 — `dt()` (Java line 93)
+```java
+ai1[n5] += (int)(j - this.m.y + (Math.random() * 50.0 - 25.0));
+```
+- **Bytecode offsets & opcodes:**
+  ```
+  102: aload_3
+  103: iload 16
+  105: dup2
+  106: iaload
+  107: i2d                         // <-- Accumulator ai1[l2] widened to double
+  ...
+  130: dadd
+  131: dadd
+  132: d2i                         // <-- ONE truncation at the end
+  133: iastore
+  ```
+- **Classification:** **Case A**.
+- **Correct JS:**
+  ```js
+  ai1[n5] = trunc(ai1[n5] + (j - this.m.y + (random() * 50.0 - 25.0)));
+  ```
+- **Mutation result:** Confirmed separate from Case B; verified via discriminator test.
+
+#### Site 3 — `dt()` (Java line 95)
+```java
+ai2[n6] += (int)(k - this.m.z + (Math.random() * 50.0 - 25.0));
+```
+- **Bytecode offsets & opcodes:**
+  ```
+  134: aload 4
+  136: iload 16
+  138: dup2
+  139: iaload
+  140: i2d                         // <-- Accumulator ai2[l2] widened to double
+  ...
+  163: dadd
+  164: dadd
+  165: d2i                         // <-- ONE truncation at the end
+  166: iastore
+  ```
+- **Classification:** **Case A**.
+- **Correct JS:**
+  ```js
+  ai2[n6] = trunc(ai2[n6] + (k - this.m.z + (random() * 50.0 - 25.0)));
+  ```
+- **Mutation result:** Confirmed separate from Case B; verified via discriminator test.
+
+---
+
+### Test Suite Execution Output
+
+```
+✔ Lasers constructor initializes speed, rads, srate, damg arrays (1.217123ms)
+✔ xs() and ys() screen projection calculations and overflow wrapping (0.205137ms)
+✔ rot() 2D rotation helper with float32 trigonometric rounding (0.378463ms)
+✔ dt() 3D transform mutates coordinates in-place and renders polygon (0.596975ms)
+✔ d() draws deterministic laser types 0, 1, 4, 5, 6, 7, 8, 10 without error (0.840895ms)
+✔ §2 compound assignment semantics in dt() jitter branch (Case A) (0.122912ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 45.459057
+```
+
+---
+
+### Fields Touched and Declared Java Types
+
+| Field | Declared Java Type | JS Storage | Notes |
+|---|---|---|---|
+| `this.m` | `Medium` | Reference | `Medium` camera/scene object |
+| `this.speed` | `int[]` (size 12) | `Int32Array` | Initialized in constructor |
+| `this.rads` | `int[]` (size 12) | `Int32Array` | Initialized in constructor |
+| `this.srate` | `int[]` (size 12) | `Int32Array` | Initialized in constructor |
+| `this.damg` | `int[]` (size 12) | `Int32Array` | Initialized in constructor |
+
+---
+
+### Preserved Bugs & Quirk Verbatim
+
+- `d()` laser type 6 vs type 11 inner geometry: Laser geometry builds scratch arrays using integer truncation of `random()` floating expressions and stores to `ai`, `ai2`, `ai3` without out-of-bounds guards (relying on 3-vertex vs 4-vertex `dt()` calls).
+- `dt()` color selection when `l1 != 0`: `i2 = 255; j2 = (l1 == 1 ? 235 : 220); k2 = (l1 == 1 ? 120 : 111);` overrides incoming `(i2, j2, k2)` parameters only if visible on screen (`flag == true`).
+- `gsmoke()` and `hsmoke()` clamp `j1 > 3` to `j1 = 3` after constructing vertex arrays with the original `j1` value.
+
+---
+
+### Places Unsure What Java Does
+None — All bytecode offsets and opcodes for arithmetic, conversions (`i2d`, `d2i`, `i2f`, `f2i`), array mutations, and polygon drawing were verified against the disassembled `Lasers.class`.
+
+---
+
+### What The Probe Does NOT Cover (Explicit Gaps)
+- Non-deterministic random vertex jitter in `dt()` when `l1 != 0` (uses unseeded `Math.random()`).
+- Non-deterministic smoke vertex placement in `gsmoke()` and `hsmoke()` (uses unseeded `Math.random()`).
+- Non-deterministic laser jitter in `d()` for laser types `i = 2, 3, 9, 11` (uses unseeded `Math.random()`).
+*(These non-deterministic paths were executed in the probe under `NONDETERMINISTIC` to verify they run without error, but their generated numbers are not asserted per TRANSPILE_SPEC §2d).*

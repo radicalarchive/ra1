@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+#
+# run_class — take ONE class all the way through the pipeline.
+#
+#   bash decompilation/run_class Craft
+#
+# The subagent has a shell (agy_ra1 runs it with --dangerously-skip-permissions),
+# so one `class` job does the whole loop: javap, transpile, probe, test, iterate
+# until green, mutation-test the §2 sites. This script launches that job and then
+# INDEPENDENTLY CHECKS IT — it does not take the job's word for anything:
+#
+#   1. agy_ra1 class -> port/<Class>.js, port/tools/<Class>Probe.java,
+#                       port/<Class>.test.js
+#   2. HERE:  recompile and re-run the probe from scratch, twice, and diff the
+#             runs (non-determinism, §2d)
+#   3. HERE:  run the WHOLE suite, not just this class's file
+#   4. On failure, one `fix` attempt, then stop for a human.
+#
+# It is a driver, not a rubber stamp: PORT_SPEC still requires you to read the
+# diff, check every §2 classification against `javap` YOURSELF, and confirm the
+# mutation goes red. The job's own report is a claim, not evidence — measured:
+# jobs have reported HIGH confidence on 13 of 14 backwards classifications.
+# The script prints that checklist at the end.
+#
+# Env: MODEL, EFFORT, TIMEOUT pass through to agy_ra1.
+#      PHASE=port|test|fix runs a single phase instead of `class`.
+
+set -euo pipefail
+
+REPO="/home/evan/resources/ra1"
+LOGS="$REPO/decompilation/logs"
+JAR_DIR="/tmp/ra1jar"
+SCRATCH="/tmp/ra1port"
+
+[ $# -eq 1 ] || { echo "usage: $0 <Class>" >&2; exit 2; }
+CLASS="$1"
+
+mkdir -p "$LOGS" "$SCRATCH/probe" "$JAR_DIR"
+[ -f "$JAR_DIR/F51.class" ] || (cd "$JAR_DIR" && unzip -oq "$REPO/ra1.jar")
+
+step() { printf '\n=== %s: %s\n' "$CLASS" "$1"; }
+
+# --- 1. the delegated job --------------------------------------------------
+if [ -f "$REPO/port/$CLASS.js" ] && [ -f "$REPO/port/$CLASS.test.js" ] \
+   && [ -f "$REPO/port/tools/${CLASS}Probe.java" ]; then
+  step "already transpiled, skipping the agy job"
+else
+  step "class job (agy)"
+  bash "$REPO/decompilation/agy_ra1" class "$CLASS" > "$LOGS/$CLASS.class.log" 2>&1 || true
+  if grep -q "quota reached" "$LOGS/$CLASS.class.log"; then
+    echo "STOP: agy quota exhausted. $(grep -o 'Resets in [^.]*' "$LOGS/$CLASS.class.log" | head -1)"
+    exit 3
+  fi
+  for f in "$REPO/port/$CLASS.js" "$REPO/port/tools/${CLASS}Probe.java" "$REPO/port/$CLASS.test.js"; do
+    [ -f "$f" ] || { echo "STOP: the job did not write $f — read $LOGS/$CLASS.class.log"; exit 1; }
+  done
+fi
+
+# --- 2. re-run the probe ourselves, from source ----------------------------
+# The job says it ran this. Run it again anyway: this is the oracle, and it is
+# the one artefact whose output must not be taken on trust.
+step "recompiling the probe"
+if ! javac -cp "$JAR_DIR" -d "$SCRATCH/probe" "$REPO/port/tools/${CLASS}Probe.java" 2> "$LOGS/$CLASS.javac.txt"; then
+  echo "STOP: the probe does not compile. See $LOGS/$CLASS.javac.txt"
+  head -20 "$LOGS/$CLASS.javac.txt"
+  exit 1
+fi
+
+step "running the probe against the real Java"
+if ! java -Djava.awt.headless=true -cp "$SCRATCH/probe:$JAR_DIR" "tools.${CLASS}Probe" \
+     > "$LOGS/$CLASS.probe.txt" 2>&1; then
+  echo "STOP: the probe threw. See $LOGS/$CLASS.probe.txt"
+  tail -20 "$LOGS/$CLASS.probe.txt"
+  exit 1
+fi
+tail -1 "$LOGS/$CLASS.probe.txt" | grep -q "PROBE OK" \
+  || { echo "STOP: probe output has no 'PROBE OK' line — it died partway. See $LOGS/$CLASS.probe.txt"; exit 1; }
+echo "  $(wc -l < "$LOGS/$CLASS.probe.txt") lines of expected values"
+
+# Anything downstream of Math.random() is non-deterministic on the Java side
+# (spec §2d). Two runs, diffed, so the caller knows which lines cannot be
+# asserted instead of chasing a phantom drift in the port.
+java -Djava.awt.headless=true -cp "$SCRATCH/probe:$JAR_DIR" "tools.${CLASS}Probe" \
+  > "$SCRATCH/$CLASS.probe2.txt" 2>&1 || true
+if ! diff -q "$LOGS/$CLASS.probe.txt" "$SCRATCH/$CLASS.probe2.txt" >/dev/null; then
+  echo "  NOTE: the probe is NOT deterministic across runs (§2d). Differing lines:"
+  # `diff` exits 1 here by construction, and pipefail would abort the run.
+  diff "$LOGS/$CLASS.probe.txt" "$SCRATCH/$CLASS.probe2.txt" | head -20 || true
+  echo "  Those fields must not be asserted; say so in the test."
+fi
+
+# --- 3. the whole suite, not just this class -------------------------------
+step "node --test (full suite)"
+if ! (cd "$REPO/port" && node --test) > "$LOGS/$CLASS.fail.txt" 2>&1; then
+  echo "  tests failed; handing the log back for one fix attempt"
+  tail -30 "$LOGS/$CLASS.fail.txt"
+  bash "$REPO/decompilation/agy_ra1" fix "$CLASS" > "$LOGS/$CLASS.fix.log" 2>&1 || true
+  if ! (cd "$REPO/port" && node --test) > "$LOGS/$CLASS.fail.txt" 2>&1; then
+    echo "STOP: still failing after the fix job. Read $LOGS/$CLASS.fail.txt and"
+    echo "      $LOGS/$CLASS.fix.log, then decide yourself — do NOT loosen the test (§2c)."
+    exit 1
+  fi
+  echo "  green after the fix job"
+fi
+(cd "$REPO/port" && node --test 2>&1 | grep -E '^# (pass|fail)|ℹ (pass|fail)' | head -4)
+
+cat <<CHECKLIST
+
+=== $CLASS is green. NOW DO THE PART A SCRIPT CANNOT ===
+  1. Read port/$CLASS.js against decompilation/java-src/$CLASS.java, side by side.
+  2. Every '+= (int)(' site: check the classification against the bytecode
+     YOURSELF — the job's report is a claim, and jobs have had this backwards
+     at HIGH confidence in both directions.
+       javap -p -c -cp $JAR_DIR $CLASS
+     Case A is 'getfield ; i2f/i2d ; ... ; fadd/dadd ; f2i/d2i ; putfield'.
+     Case B is 'getfield ; ... ; f2i/d2i ; iadd/isub ; putfield'.
+  3. §2e: flip each §2 site to the other case, re-run node --test, CONFIRM RED,
+     revert. A green test you have never seen fail is not evidence.
+  4. Check every Java int[] became intArray() — locals too (§5b).
+  5. Check reads that can overrun go through at() (§5c).
+  6. Check it IMPORTS its collaborators instead of stubbing them, and that the
+     probe starts each section from a fresh instance.
+  7. Append anything a future agent would waste an hour on to WORK.md.
+CHECKLIST

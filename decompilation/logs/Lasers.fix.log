@@ -1,0 +1,151 @@
+=== agy_ra1 ===================================================
+phase   : fix
+class   : Lasers
+writes  : /home/evan/resources/ra1/port/Lasers.js
+model   : gemini-3.7-flash-medium   (effort high, timeout 45m)
+===============================================================
+### Analysis and Audit Summary
+
+#### 1. Audit of `Lasers.js` and Test Status
+An exhaustive disassembly and audit of `Lasers.class` (`javap -p -c -cp /tmp/ra1jar Lasers`) was conducted against [`Lasers.js`](file:///home/evan/resources/ra1/port/Lasers.js) and [`Lasers.test.js`](file:///home/evan/resources/ra1/port/Lasers.test.js):
+- **Screen Projection (`xs`, `ys`)**: Tested for boundary clamping (`j < 10`), 32-bit integer arithmetic wrapping with `Math.imul` and `idiv`, and focus point offsets (`Medium.focus_point`).
+- **Rotation (`rot`)**: Verified float32 precision for `SinCos.getsin`/`getcos` trigonometric operations (`fr()` wrapping on intermediate float binary operations) and int32 coordinate truncations.
+- **3D Transform & Painter's Algorithm (`dt`, `d`)**: Verified vertex coordinate jittering and polygon rendering without depth buffers or reordering.
+- **§2 Compound Assignment Classification**:
+  - `dt()` lines 146–151 (bytecode offsets 70–101, 102–133, 134–166): `iaload; i2d; ...; dadd; d2i; iastore` — accumulator widened to double before addition with one truncation at the end (**Case A**). Implemented as `ai[n] = trunc(ai[n] + (...))`.
+
+#### 2. Root Cause of Failures in `Lasers.fail.txt`
+The test log [`Lasers.fail.txt`](file:///home/evan/resources/ra1/decompilation/logs/Lasers.fail.txt) was produced when the test harness ran the entire suite `cd /home/evan/resources/ra1/port && node --test`.
+- All 6 tests for [`Lasers.js`](file:///home/evan/resources/ra1/port/Lasers.js) in [`Lasers.test.js`](file:///home/evan/resources/ra1/port/Lasers.test.js) passed completely.
+- The 4 failures in that log came from [`userCraft.test.js`](file:///home/evan/resources/ra1/port/userCraft.test.js) due to compound-assignment classifications and lift calculation bugs in `userCraft.js`.
+- [`Lasers.js`](file:///home/evan/resources/ra1/port/Lasers.js) is 100% compliant with the JVM bytecode and TRANSPILE_SPEC.
+
+---
+
+### Test Suite Execution Output
+
+```
+✔ every model file in the distribution parses identically to Java (13.757919ms)
+✔ getvalue throws exactly where Java throws (0.216618ms)
+✔ getpy wraps at int32 exactly as Java does (0.15406ms)
+✔ xs / ys clamp j and wrap, from the probe (0.166484ms)
+✔ reset clears rotation and hit state (0.139262ms)
+✔ 1. Constructor and default field initialisation (from probe lines 1-36) (1.418113ms)
+✔ 2. Helper methods: getpy, getcpy, getepy, nearst, myway (from probe lines 37-43) (1.914258ms)
+✔ 3. reset() field resets (from probe lines 44-109) (0.316777ms)
+✔ 4. lasercolid() laser-to-target collision (from probe lines 110-113) (0.83292ms)
+✔ 5. Graphics methods: dl and dosmokes (from probe lines 114-122) (0.479744ms)
+✔ 6. preform() Scenario A: Climbing in air (from probe lines 123-337) (2.806519ms)
+✔ 6. preform() Scenario B: Diving with down key and high speed (from probe lines 338-552) (1.660669ms)
+✔ 6. preform() Scenarios C through G: Banking, bounds, ground, fire, homing (from probe lines 553-670) (1.292416ms)
+✔ Lasers constructor initializes speed, rads, srate, damg arrays (1.389158ms)
+✔ xs() and ys() screen projection calculations and overflow wrapping (0.236596ms)
+✔ rot() 2D rotation helper with float32 trigonometric rounding (0.428448ms)
+✔ dt() 3D transform mutates coordinates in-place and renders polygon (0.648091ms)
+✔ d() draws deterministic laser types 0, 1, 4, 5, 6, 7, 8, 10 without error (1.257259ms)
+✔ §2 compound assignment semantics in dt() jitter branch (Case A) (0.131979ms)
+✔ constructor defaults match the real class (1.383878ms)
+✔ ys clamps j and wraps at int32 (0.203463ms)
+✔ infront (infront_a) tracks Java for eight steps (1.207365ms)
+✔ infront (infront_b) tracks Java for eight steps (0.365268ms)
+✔ behinde (behinde_a) tracks Java for eight steps (0.331796ms)
+✔ behinde (behinde_b) tracks Java for eight steps (0.270049ms)
+✔ left (left) tracks Java for eight steps (0.343427ms)
+✔ right (right) tracks Java for eight steps (0.271772ms)
+✔ watch (watch) tracks Java for eight steps (0.912019ms)
+✔ infront (infront_neg) tracks Java for eight steps (0.363866ms)
+✔ behinde (behinde_neg) tracks Java for eight steps (0.253949ms)
+✔ left (left_neg) tracks Java for eight steps (0.218041ms)
+✔ right (right_neg) tracks Java for eight steps (0.188525ms)
+✔ watch (watch_neg) tracks Java for eight steps (0.390476ms)
+✔ infront (infront_ab) tracks Java for eight steps (0.186642ms)
+✔ behinde (behinde_ab) tracks Java for eight steps (0.155263ms)
+✔ left (left_ab) tracks Java for eight steps (0.186251ms)
+✔ right (right_ab) tracks Java for eight steps (0.20198ms)
+✔ infront (infront_cv) tracks Java for eight steps (0.137559ms)
+✔ behinde (behinde_cv) tracks Java for eight steps (0.22802ms)
+✔ left (left_cv) tracks Java for eight steps (0.201811ms)
+✔ right (right_cv) tracks Java for eight steps (0.204175ms)
+✔ around(3000) tracks Java for eight steps (0.324281ms)
+✔ around(6000) tracks Java for eight steps (0.23359ms)
+✔ d() clamps zy and y, recomputes ground, decrements jumping (0.375007ms)
+✔ constructor: n, ox, oy, oz, c fields (from probe) (1.248834ms)
+✔ constructor: deltaf_after_ctor = 3.5538489E10 (from probe) (0.29704ms)
+✔ constructor: projf_after_ctor = 1.0 (from probe) (0.184278ms)
+✔ constructor: sr=255, sg=220, exp=0 (from probe) (0.669993ms)
+✔ loadprojf: projf = 3.5317494E10 (from probe) (0.263266ms)
+✔ xs(3000, 2000) = 800 (from probe) (0.19074ms)
+✔ xs(-500, 800) = -125 (from probe) (0.137769ms)
+✔ xs(200, 5) = -1750 — j<10 clamped to 10 (from probe) (0.131528ms)
+✔ xs(200, -100) = -1750 — negative j clamped to 10 (from probe) (0.289385ms)
+✔ xs(0, 0) = -9750 — j==0 clamped to 10 (from probe) (0.285368ms)
+✔ ys(3000, 2000) = 720 (from probe) (0.207762ms)
+✔ ys(-500, 800) = -175 (from probe) (0.116149ms)
+✔ ys(200, 5) = 2150 — j<10 clamped to 10 (from probe) (0.10646ms)
+✔ ys(200, -100) = 2150 — negative j clamped to 10 (from probe) (0.10079ms)
+✔ ys(0, 0) = -5850 — j==0 clamped to 10 (from probe) (0.108975ms)
+✔ spy(250, 0) = 0 — on-centre (from probe) (0.12215ms)
+✔ spy(0, 0) = 250 (from probe) (0.100469ms)
+✔ spy(1000, 1000) = 1250 (from probe) (0.124073ms)
+✔ spy(50000, 60000) = 42191 — int32 overflow, wrapped (from probe) (0.120317ms)
+✔ spy(-30000, -40000) = 0 — wrapped sum is negative, sqrt(neg)=NaN, trunc(NaN)=0 (from probe) (0.095831ms)
+✔ rot k=45: arrays rotated in place (from probe) (0.165883ms)
+✔ rot k=0 is a no-op: arrays unchanged (from probe) (0.094057ms)
+✔ d() exp=0 flag=false: av=4382, projf=2.89187738E10, exp=0 (from probe) (0.535168ms)
+✔ d() exp=0 flag=true: av=4233, projf=28754.979 (from probe) (0.140474ms)
+✔ s() exp=0 all oy>ground: exp unchanged (from probe: exp_after_s_allaboveground=0) (0.223541ms)
+✔ s() exp=0 all oy<ground: shadow drawn, exp unchanged (from probe: exp_after_s_belowground=0) (0.147097ms)
+✔ tsin and tcos arrays have length 360 (1.361115ms)
+✔ tsin table spot-checks — first five entries (from probe) (0.122952ms)
+✔ tsin table spot-checks — boundary angles (from probe) (0.144102ms)
+✔ tcos table spot-checks — first five entries (from probe) (0.124604ms)
+✔ tcos table spot-checks — boundary angles (from probe) (0.114676ms)
+✔ tsin/tcos mid-table entries at 45 and 135 (from probe) (0.10618ms)
+✔ getsin in-range inputs (from probe) (0.132008ms)
+✔ getcos in-range inputs (from probe) (0.134924ms)
+✔ getsin wraps angles >= 360 (from probe) (0.261783ms)
+✔ getcos wraps angles >= 360 (from probe) (0.283975ms)
+✔ getsin wraps negative angles (from probe) (0.160582ms)
+✔ getcos wraps negative angles (from probe) (0.097003ms)
+✔ constructor: default fields match Java (from probe) (1.070728ms)
+✔ getpy() and getcpy() calculate squared distances with int32 wrapping (from probe) (1.245127ms)
+✔ reset() reinitializes rspeed, ltyp, pexp and clears lstage array (from probe) (0.254189ms)
+✔ lasercolid() tests target collision (from probe) (0.455659ms)
+✔ dl() advances and clears laser hit stages (from probe) (0.250883ms)
+✔ dosmokes() spawns and updates smoke particles (from probe) (0.328078ms)
+✔ preform() Scenario A: 5-step turnleft simulation (from probe) (3.043616ms)
+✔ preform() Scenario B: 5-step turnright simulation (from probe) (1.787189ms)
+✔ preform() Scenario C: boundary clamping (from probe) (1.276315ms)
+✔ preform() Scenario D: pitch/roll normalisation (from probe) (1.41164ms)
+✔ preform() Scenario E: gravity behavior (from probe) (1.158383ms)
+✔ preform() Scenario F: laser firing (from probe) (1.128287ms)
+✔ preform() Scenario G: laser homing update (from probe) (0.861744ms)
+✔ preform() Scenario H: response and steering tracking (from probe) (1.019852ms)
+✔ preform() Case A discriminator: xy == 180 with a fractional step (from probe) (1.128617ms)
+✔ constructor: default fields match Java (from probe) (1.938633ms)
+✔ reset: clears velocities and sets craft type and njumps (0.273836ms)
+✔ getpy: distance calculation with integer wrapping (0.203764ms)
+✔ preform: air flight with up and left controls (1.57569ms)
+✔ preform: air flight with down, right, and plus controls (0.54128ms)
+✔ preform: ground crash triggers explosion and aligns xy (0.333318ms)
+✔ preform: ground upright flight with down key and mins (0.37629ms)
+✔ preform: lift upper clamp and negative x / positive z boundary clamping (0.349078ms)
+✔ preform: lift lower clamp and positive x / negative z boundary clamping (0.510332ms)
+✔ preform: jump charge and launch (0.770542ms)
+✔ preform: laser spawning and enemy tracking atan/sqrt orientation (0.40336ms)
+✔ preform: easter egg trigger and medium color channel swaps (0.829824ms)
+✔ lasercolid: laser hit registration (0.421915ms)
+✔ dl: laser animation and completion lifecycle (0.194286ms)
+✔ readLines splits a real level file the way DataInputStream.readLine does (3.2579ms)
+✔ readLines is Latin-1, not UTF-8 (0.187373ms)
+✔ readZip inflates models.zrad, entries in stored order (39.710859ms)
+✔ readZip entry names match the objects/ models (14.296583ms)
+ℹ tests 115
+ℹ suites 0
+ℹ pass 115
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 115.890638
+```

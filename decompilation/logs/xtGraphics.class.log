@@ -1,0 +1,112 @@
+=== agy_ra1 ===================================================
+phase   : class
+class   : xtGraphics
+writes  : /home/evan/resources/ra1/port/xtGraphics.js, /home/evan/resources/ra1/port/tools/xtGraphicsProbe.java and /home/evan/resources/ra1/port/xtGraphics.test.js
+model   : gemini-3.7-flash-medium   (effort high, timeout 90m)
+===============================================================
+### Summary of Completed Work
+
+The transpilation of [`xtGraphics.java`](file:///home/evan/resources/ra1/decompilation/java-src/xtGraphics.java) to [`xtGraphics.js`](file:///home/evan/resources/ra1/port/xtGraphics.js) has been completed, differential probe written and run, test suite implemented and verified, and mutation tests confirmed.
+
+---
+
+### 1. Created Files
+
+1. **[`port/xtGraphics.js`](file:///home/evan/resources/ra1/port/xtGraphics.js)**: Line-by-line ES module transpilation of `xtGraphics.java`, adhering to `TRANSPILE_SPEC.md` (§0 line-by-line mapping, §1 numeric semantics, §2b wrapping int32 math with `i32()` and `Math.imul()`, §4 Painter's algorithm order preservation, and typed array storage).
+2. **[`port/tools/xtGraphicsProbe.java`](file:///home/evan/resources/ra1/port/tools/xtGraphicsProbe.java)**: Java reflection probe that drives `xtGraphics` in the real reference JAR (`ra1.jar`) headlessly and outputs deterministic state values.
+3. **[`port/xtGraphics.test.js`](file:///home/evan/resources/ra1/port/xtGraphics.test.js)**: `node:test` suite verifying constructor defaults, mathematical projections (`xs`, `ys`, `getcpy`), reset routines (`reset`, `creset`, `alldest`), fullscreen pixel blending (`drawefimg`, `drawpimg`, `drawop`, `drawl`, `drawovimg`, `cmback`), HUD tracker updates (`dtrakers`), and menu state machines (`denter`).
+4. **[`decompilation/logs/xtGraphics.probe.txt`](file:///home/evan/resources/ra1/decompilation/logs/xtGraphics.probe.txt)**: Probe execution log.
+
+---
+
+### 2. Compound-Assignment Audit (§2)
+
+Grep search for `+= (int)(` and `-= (int)(` across `xtGraphics.java`: **0 hits**.
+
+Disassembly of all arithmetic sites in `xtGraphics.class` confirmed that all `+=` and `-=` occurrences operate solely on integer types:
+- Lines 247–248: `l += aconto[k2].nhits; j2 += aconto[k2].maxhits;` (integer addition)
+- Line 379: `contO.x -= 100;` (integer subtraction)
+- Line 383: `contO2.x += 100;` (integer addition)
+- Line 417: `contO3.xz += 2;` (integer addition)
+- Line 488: `contO4.xz += 7 + i3;` (integer addition)
+- Line 625: `contO5.zy += 5;` (integer addition)
+- Line 169: `this.cnts -= 7;` (integer subtraction)
+- Lines 1249, 1252, 1255: `l5 -= 360;`, `l5 += 360;`, `k5 += 180;` (integer angle normalization)
+
+There are **0** narrowing compound-assignment sites requiring Case A / Case B classification.
+
+---
+
+### 3. Mutation Testing Results
+
+To verify assertion coverage on the mathematical calculations in `xtGraphics.js`:
+- **Mutation 1 (`xs` clamp boundary)**: Mutated `if (j < 10)` to `if (j < 5)`.
+  - Result: **RED** (Caught by `xs(200, 5)` & `xs(0, 0)` clamp assertions). Reverted.
+- **Mutation 2 (`getcpy` int32 overflow wrap)**: Mutated `i32(i32(Math.imul(dx, dx) + Math.imul(dy, dy)) + Math.imul(dz, dz))` to `dx * dx + dy * dy + dz * dz`.
+  - Result: **RED** (Caught by `getcpy_wrap32` int32 overflow assertion: expected `-1089934592`, got `7500000000`). Reverted.
+- **Mutation 3 (`ys` division and rounding)**: Mutated `i32(idiv(Math.imul(j - this.m.focus_point, this.m.cy - i), j) + i)` to float division `((j - this.m.focus_point) * (this.m.cy - i)) / j + i`.
+  - Result: **RED** (Caught by `ys` assertions). Reverted.
+
+---
+
+### 4. Field Touch List & Declared Types
+
+| Field | Java Type | JS Storage |
+|---|---|---|
+| `m` | `Medium` | `this.m = medium;` |
+| `ftm` | `FontMetrics` | `this.ftm = g.getFontMetrics();` |
+| `goodsun` | `boolean` | `false` |
+| `cl` | `int` | `1` |
+| `radar`, `stube`, `sback`, `destr`, `mback`, `lay`, `complete`, `main`, `rad`, `inst1`, `inst2`, `inst3`, `mars`, `text` | `Image` | `null` |
+| `as` | `Image[]` | `objArray(5)` |
+| `pix`, `bpix`, `mpix`, `opix`, `ppix` | `int[180000]` | `intArray(180000)` (`Int32Array`) |
+| `cnt`, `cnts`, `cntf`, `wcnt`, `rcnt`, `cnty`, `fase`, `selected`, `select`, `oldfase`, `nb`, `sgame`, `level`, `tcnt` | `int` | numbers (`0`, `10`, `-8`, etc.) |
+| `flik`, `left`, `frst`, `mcomp` | `boolean` | `false` |
+| `ws` | `int[5]` | `Int32Array.of(62, 73, 59, 40, 50)` |
+| `ob`, `obx`, `oby`, `obz` | `int[3]` | `intArray(3)` (`Int32Array`) |
+| `cnte` | `int[19]` | `intArray(19)` (`Int32Array`) |
+| `nam` | `String[3]` | `new Array(3).fill(null)` |
+| `mname` | `String[19]` | `new Array(19).fill(null)` |
+| `tnk` | `boolean[3]` | `new Array(3).fill(false)` |
+| `dest` | `boolean[10]` | `new Array(10).fill(false)` |
+
+---
+
+### 5. Preserved Game Bugs & Engine Specifics
+
+1. **Array sizing**: `this.dest` is allocated with length 10 (`new boolean[10]`), but `reset()` and `alldest()` only loop over indices `0..4`. Preserved verbatim.
+2. **`dtrakers` character constants**: `char c = '\u03e8'` (1000) and `'\u0fa0'` (4000) used as distance thresholds. Preserved verbatim.
+3. **`denter` phase 4 ground calculation**: `this.m.ground = 950 - this.m.y;` (recalculated on credits transition). Preserved verbatim.
+
+---
+
+### 6. Non-Deterministic & Uncovered Paths
+
+- **Excluded from assertions (Downstream of `Math.random()`)**:
+  - Lightning lines drawn in `fase === -5` (lines 160–163).
+  - Enemy `xz` angle randomized during `fase === -2` (line 337).
+  - Random plane index chosen during credits rotation (line 621).
+  - Random RGB color flashes on the mission complete banner (line 1136).
+- **PixelGrabber in Node**: Headless Node.js test environment provides a mock Canvas 2D backend for `imageFromPixels` and `saveit` (in-browser, the real Canvas 2D engine in `graphics.js` executes).
+
+---
+
+### 7. Test Suite Results
+
+```
+✔ 1. Constructor and default field initialisation (from probe lines 1-35) (1.33202ms)
+✔ 2. Screen projection and distance calculations (from probe lines 36-53) (1.909097ms)
+✔ 3. Reset and alldest state transitions (from probe lines 54-69) (0.4674ms)
+✔ 4. Pixel blending algorithms and buffer updates (from probe lines 67-76) (34.883877ms)
+✔ 5. dtrakers tracking scenarios (from probe lines 77-81) (3.102275ms)
+✔ 6. denter phase transitions (from probe lines 82-120) (15.106643ms)
+
+ℹ tests 122
+ℹ suites 0
+ℹ pass 122
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 126.378138
+```

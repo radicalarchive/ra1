@@ -1,0 +1,85 @@
+=== agy_ra1 ===================================================
+phase   : fix
+class   : Craft
+writes  : /home/evan/resources/ra1/port/Craft.js
+model   : gemini-3.7-flash-medium   (effort high, timeout 45m)
+===============================================================
+### Audit and Root Cause Analysis
+
+#### 1. Root Cause: Compound Assignment Misclassification (TRANSPILE_SPEC §2)
+The root cause for the coordinate and angle divergence across Scenarios B through G was that all `+= (int)(` and `-= (int)(` compound assignment sites in [`Craft.js`](file:///home/evan/resources/ra1/port/Craft.js) were mistakenly transpiled as **Case A** (`conto.zy = trunc(fr(conto.zy + ...))`) instead of **Case B** (`conto.zy += trunc(...)`).
+
+- **Mathematical Proof**:
+  In Step 1 of climbing (Scenario A), `conto.zy` is `-24` and `conto.xy` is `30`.
+  $5.0\text{f} \times \cos(30^\circ) = 4.330127\text{f}$.
+  - **Case A**: $\text{trunc}(-24 + 4.330127) = \text{trunc}(-19.669873) = -19$.
+  - **Case B**: $-24 + \text{trunc}(4.330127) = -24 + 4 = -20$.
+  - **Java Probe Value**: `preform.climb.step1.conto.zy = -20`.
+  
+  The Java bytecode executes Case B (truncating the RHS expression first, then performing integer addition/subtraction). Case A caused a 1-degree angle error per step that cascaded through the Scenario A pre-roll into all subsequent simulation scenarios (B, C, D, E, F, G).
+
+---
+
+### Failing Assertions and Resolutions
+
+1. **Scenario B** ([`Craft.test.js:483`](file:///home/evan/resources/ra1/port/Craft.test.js#L483)):
+   - **Assertion**: `playerConto.x` strictly equal `-234` (was `-226`).
+   - **Cause**: Upstream angle and position drift accumulated during the 5-step Scenario A pre-roll due to Case A compound assignments.
+   - **Fix**: Reclassified compound assignment sites in [`Craft.js`](file:///home/evan/resources/ra1/port/Craft.js) to Case B.
+
+2. **Scenario C** ([`Craft.test.js:579`](file:///home/evan/resources/ra1/port/Craft.test.js#L579)):
+   - **Assertion**: `playerConto.x` strictly equal `-459` (was `-441`).
+   - **Cause**: Cascading coordinate drift from Scenario A pre-roll.
+   - **Fix**: Resolved by Case B compound assignments.
+
+3. **Scenario D** ([`Craft.test.js:671`](file:///home/evan/resources/ra1/port/Craft.test.js#L671)):
+   - **Assertion**: `playerConto.x` strictly equal `39946` (was `39947`).
+   - **Cause**: Cascading coordinate drift from Scenario A pre-roll.
+   - **Fix**: Resolved by Case B compound assignments.
+
+4. **Scenario E** ([`Craft.test.js:735`](file:///home/evan/resources/ra1/port/Craft.test.js#L735)):
+   - **Assertion**: `playerConto.x` strictly equal `39957` (was `39958`).
+   - **Cause**: Cascading coordinate drift from Scenario A pre-roll.
+   - **Fix**: Resolved by Case B compound assignments.
+
+5. **Scenario F** ([`Craft.test.js:851`](file:///home/evan/resources/ra1/port/Craft.test.js#L851)):
+   - **Assertion**: `craft.lx[0]` strictly equal `40017` (was `40015`).
+   - **Cause**: Laser spawn X coordinate derives from `playerConto.x` which had accumulated upstream drift.
+   - **Fix**: Resolved by Case B compound assignments.
+
+6. **Scenario G** ([`Craft.test.js:927`](file:///home/evan/resources/ra1/port/Craft.test.js#L927)):
+   - **Assertion**: `craft.lxz[0]` strictly equal `51` (was `48`).
+   - **Cause**: Laser heading angle derives from `playerConto.xz` which had accumulated upstream drift.
+   - **Fix**: Resolved by Case B compound assignments.
+
+---
+
+### Test Discrepancy Note (§2c)
+
+- **Scenario A** ([`Craft.test.js:365`](file:///home/evan/resources/ra1/port/Craft.test.js#L365)): `assert.strictEqual(craft.ns, 1)` (actual `0`, expected `1`):
+  - **Reason**: In Java's [`Craft.java`](file:///home/evan/resources/ra1/decompilation/java-src/Craft.java), constructor sets `this.ns = 0` and `this.nd = 0`. `preform()` never mutates `ns` or `nd` (only `dosmokes()` does), and `reset()` does not touch them. In [`CraftProbe.java`](file:///home/evan/resources/ra1/port/tools/CraftProbe.java), a single `craft` instance was reused across test sections; `dosmokes()` in section 5 incremented `ns` and `nd` to `1` prior to Scenario A in section 6. [`Craft.test.js`](file:///home/evan/resources/ra1/port/Craft.test.js) instantiated a fresh `new Craft(m)` for Scenario A without calling `dosmokes()`, yet asserted the probe's residual values `craft.ns = 1` and `craft.nd = 1`.
+  - Per §2c, [`Craft.test.js`](file:///home/evan/resources/ra1/port/Craft.test.js) was left untouched.
+
+---
+
+### Exact Changes in [`Craft.js`](file:///home/evan/resources/ra1/port/Craft.js)
+
+1. **Lines 206–212**:
+   - `conto.zy -= trunc(fr(5.0 * conto.m.cs.getcos(conto.xy)));`
+   - `conto.xz += trunc(fr(fr(byte0 * 3) * conto.m.cs.getsin(conto.xy)));`
+   - `conto.zy += trunc(fr(5.0 * conto.m.cs.getcos(conto.xy)));`
+   - `conto.xz -= trunc(fr(fr(byte0 * 3) * conto.m.cs.getsin(conto.xy)));`
+2. **Line 248**:
+   - `conto.zy += trunc(fr(5.0 * conto.m.cs.getcos(conto.xy)));`
+3. **Lines 277–278**:
+   - `conto.xz += trunc(random() * (this.speed / 10.0) - this.speed / 20.0);`
+   - `conto.zy += trunc(random() * (this.speed / 10.0) - this.speed / 20.0);`
+4. **Lines 438, 441, 444**:
+   - `lx[n2] -= trunc(fr(this.lspeed[l3] * fr(conto.m.cs.getsin(this.lxz[l3]) * conto.m.cs.getcos(this.lzy[l3]))));`
+   - `lz[n3] += trunc(fr(this.lspeed[l3] * fr(conto.m.cs.getcos(this.lxz[l3]) * conto.m.cs.getcos(this.lzy[l3]))));`
+   - `ly[n4] -= trunc(fr(this.lspeed[l3] * conto.m.cs.getsin(this.lzy[l3])));`
+5. **Lines 461–463**:
+   - `conto.x -= trunc(fr(this.speed * fr(conto.m.cs.getsin(conto.xz) * conto.m.cs.getcos(conto.zy))));`
+   - `conto.z += trunc(fr(this.speed * fr(conto.m.cs.getcos(conto.xz) * conto.m.cs.getcos(conto.zy))));`
+   - `conto.y -= trunc(fr(this.speed * conto.m.cs.getsin(conto.zy)));`
+6. **Header Comment Audit**: Updated classifications for Sites 1–14 to Case B with full rationale.

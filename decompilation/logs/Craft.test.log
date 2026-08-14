@@ -1,0 +1,62 @@
+=== agy_ra1 ===================================================
+phase   : test
+class   : Craft
+writes  : /home/evan/resources/ra1/port/Craft.test.js
+model   : gemini-3.7-flash-medium   (effort high, timeout 45m)
+===============================================================
+### Work Completed
+
+Created [`port/Craft.test.js`](file:///home/evan/resources/ra1/port/Craft.test.js), a `node:test` suite that drives [`port/Craft.js`](file:///home/evan/resources/ra1/port/Craft.js) identically to [`port/tools/CraftProbe.java`](file:///home/evan/resources/ra1/port/tools/CraftProbe.java) and asserts the literal output from [`decompilation/logs/Craft.probe.txt`](file:///home/evan/resources/ra1/decompilation/logs/Craft.probe.txt).
+
+---
+
+### What Was Asserted
+
+1. **Constructor & Initial Fields** (probe lines 1–36):
+   - All primitive fields: `rspeed = 0`, `speed = 0.0`, `rlift = 0`, `lift = 0.0`, `pexp = false`, `ltyp = 3`, `nl = 0`, `skip = false`, `bulkc = 0`, `ns = 0`, `smoke = false`, `nd = 0`, `gxz = 0`, `gzy = 0`, `responce = false`, `trgxz = 0`, `trgzy = 0`, `out = 0`, `tcnt = 0`, `engage = true`, `enx = 0`, `eny = 0`, `enz = 0`, `ens = 4`, `targeting = false`, `mode = 0`, `m3o = 0`, `m3cnt = 0`, `m1cnt = 0`, `relax = 50`, `runn = 30`, `liftup = 500`, `dracs = false`.
+   - Initial array states: `sms = [-1, -1, -1, -1]`, `dms = [-1, -1, -1, -1]`, and `lstage` (20 zeros).
+
+2. **Helper Methods** (probe lines 37–43):
+   - `getpy`: `test1 = 168750000`, `test2 = 42320000`.
+   - `getcpy`: `test1 = 1707500`.
+   - `getepy`: `test1 = 770000`.
+   - `nearst`: `target = 1`.
+   - `myway`: `obstacle = false`, `clear = false`.
+
+3. **Reset Invocations** (probe lines 44–109):
+   - `reset(120, 2, 40, 25, 600, 1)`: all 33 state fields.
+   - `reset(80, 1, 60, 35, 400, 0)`: all 33 state fields.
+
+4. **Laser Collision** (probe lines 110–113):
+   - `lasercolid`: `lhit[0] = 1`, `lhit[1] = 0`, `conto.hit = true`, `conto.nhits = 2`.
+
+5. **Graphics Methods** (probe lines 114–122):
+   - `dl`: `lhit[0] = 0`, `lhit[1] = 2`, `lhit[2] = 3`, `lstage[2] = 0`.
+   - `dosmokes`: `nd = 1`, `ns = 1`, `smoke = false`, `dms[0] = 1`, `sms[0] = 1`.
+
+6. **Multi-Step `preform()` Simulations** (probe lines 123–670):
+   - **Scenario A (Climbing in air)**: 5 steps asserting all `conto` and `craft` state variables.
+   - **Scenario B (Diving with down key & high speed)**: 5 steps asserting all `conto` and `craft` state variables.
+   - **Scenario C (Banking left & right)**: 3 steps bank-left and 3 steps bank-right asserting `conto` state variables.
+   - **Scenario D (Boundary clamping)**: `playerConto.x = 39946`, `playerConto.z = -39956`, `playerConto.xz = 51`.
+   - **Scenario E (Ground contact / crash)**: `playerConto` position/orientation/damage and `craft` speed/rlift/lift/pexp/smoke.
+   - **Scenario F (Laser firing)**: `nl = 1`, `lstage[0] = 2`, `lspeed[0] = 150`, `lx[0] = 40017`, `ly[0] = 21`, `lz[0] = -40013`.
+   - **Scenario G (Laser homing update)**: `lxz[0] = 51`, `lzy[0] = 121`, `nf[0] = 2`, `lx[0] = 40077`, `ly[0] = -107`, `lz[0] = -40061`.
+
+---
+
+### What Was Excluded and Why
+
+Per TRANSPILE_SPEC §2d, non-deterministic fields downstream of unseeded Java `Math.random()` cannot produce stable expected values:
+- `craft.turnat`: Initialized via `(int)(Math.random() * 50.0)`.
+- `craft.dx[0]` / `craft.sx[0]`: Position offsets randomized in `dosmokes()`.
+- Random AI evasion branches and evasive turn targets in `preform()`.
+
+These are explicitly documented in the test file header and comments.
+
+---
+
+### Discrepancies and Code Changes
+
+- **Unexplained Values**: None. All values produced by the real Java probe matched the transpiled JavaScript implementation.
+- **Changes to [`Craft.js`](file:///home/evan/resources/ra1/port/Craft.js)**: None required. All compound-assignment classifications (Case B across all 14 sites) and 32-bit integer/float semantics in [`Craft.js`](file:///home/evan/resources/ra1/port/Craft.js) are verified.

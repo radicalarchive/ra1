@@ -1,0 +1,51 @@
+<!doctype html>
+<!--
+  Headless boot check for the port. main.html waits for a click (WebAudio needs
+  a user gesture); this page calls boot() straight away so Chromium can run it
+  with --headless --screenshot and prove the game gets past loading.
+
+  Serve from the repo root and open /port/tools/boot-smoke.html.
+  Errors are printed into #log AND thrown, so a screenshot shows the failure.
+-->
+<meta charset="utf-8">
+<title>ra1 boot smoke</title>
+<style>
+  body { margin: 0; background: #222; color: #eee; font: 12px monospace; }
+  canvas { display: block; image-rendering: pixelated; }
+  #log { white-space: pre-wrap; padding: 4px; }
+</style>
+<canvas id="screen" width="500" height="360" tabindex="0"></canvas>
+<div id="log"></div>
+<script type="module">
+  import { boot } from '../main.js';
+
+  const log = (s) => { document.getElementById('log').textContent += s + '\n'; console.log('SMOKE ' + s); };
+  window.addEventListener('error', (e) => log('ERROR ' + (e.error?.stack || e.message)));
+  window.addEventListener('unhandledrejection', (e) => log('REJECT ' + (e.reason?.stack || e.reason)));
+
+  // Count game-loop iterations. F51.run() calls repaint() exactly once per
+  // iteration, so this measures the GAME's frame rate, not the display's —
+  // the pacer deliberately runs the game slower than the refresh rate.
+  const { F51 } = await import('../F51.js');
+  window.__ticks = 0;
+  const realRepaint = F51.prototype.repaint;
+  F51.prototype.repaint = function () { window.__ticks++; return realRepaint.call(this); };
+
+  const canvas = document.getElementById('screen');
+  try {
+    window.__game = await boot(canvas);
+    log('boot() returned');
+    // Report whether anything was actually drawn, so a black canvas is not
+    // mistaken for a working boot.
+    setTimeout(() => {
+      const px = canvas.getContext('2d').getImageData(0, 0, 500, 360).data;
+      let nonBlank = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        if (px[i] !== 0 || px[i + 1] !== 0 || px[i + 2] !== 0) nonBlank++;
+      }
+      log(`non-blank pixels: ${nonBlank} / ${500 * 360}`);
+    }, 3000);
+  } catch (e) {
+    log('BOOT THREW ' + (e.stack || e));
+  }
+</script>

@@ -1,0 +1,223 @@
+### Completed File: [`/home/evan/resources/ra1/port/main.js`](file:///home/evan/resources/ra1/port/main.js)
+
+```javascript
+// main.js — boot Radical Aces in the browser.
+//
+// Bridges the browser's DOM / WebAudio / Event environment to Java's AWT 1.0
+// lifecycle (main -> init -> start) and event model.
+//
+// In original Java (F51.java):
+//   1. main() constructs Frame, creates F51 instance, calls f.init(), f.start().
+//   2. init() creates offscreen image (500x360), sets up font, loads cookie/keys,
+//      and disables focus traversal keys (setFocusTraversalKeysEnabled(false)).
+//   3. start() spawns the game thread.
+//   4. AWT event callbacks (keyDown, keyUp, mouseDown, lostFocus) dispatch inputs.
+//
+// Browser differences:
+//   - AudioContext requires a user gesture before resuming/starting playback.
+//     main.html handles the gesture overlay; boot() unlocks WebAudio immediately.
+//   - Fixed 500x360 canvas backing store is styled via CSS for scaling; mouse
+//     coordinates from DOM events must be scaled from CSS pixels to 500x360 game space.
+//   - DOM KeyboardEvents must be mapped to AWT 1.0 integer constants via input.js.
+//   - Browsers use TAB and arrow keys for focus / scrolling; we call preventDefault()
+//     only for bound game navigation/action keys to mimic setFocusTraversalKeysEnabled(false),
+//     without intercepting browser shortcuts like Ctrl+R or F12.
+//   - DOM keydown auto-repeats on held keys; Java's AWT behaves identically and F51's
+//     key set mutations are idempotent, while the `enterd` latch in keyDown guards
+//     single-trigger keys like Enter across repeat events.
+
+import * as audio from './audio.js';
+import { F51 } from './F51.js';
+import { awtCode, EVENT_UP, EVENT_DOWN, EVENT_LEFT, EVENT_RIGHT } from './input.js';
+
+/**
+ * Boots the game onto the provided 500x360 canvas.
+ *
+ * @param {HTMLCanvasElement} canvas
+ * @returns {Promise<{ f: F51, stop: () => void }>}
+ */
+export async function boot(canvas) {
+  // 1. Validate canvas dimensions.
+  // The game logic strictly assumes a 500x360 framebuffer. CSS handles display
+  // scaling (pixelated nearest-neighbor); backing store must stay exactly 500x360.
+  if (!canvas || canvas.width !== 500 || canvas.height !== 360) {
+    throw new Error(
+      `Canvas must be 500x360 (received ${canvas ? `${canvas.width}x${canvas.height}` : 'null'})`
+    );
+  }
+
+  // 2. Unlock WebAudio.
+  // Browsers block AudioContext creation/playback until a user gesture has occurred.
+  // main.html invokes boot() inside a click handler on #gesture, satisfying this.
+  audio.unlock();
+
+  // 3. Initialize and start F51.
+  // Mirrors Java main(): new F51() -> f.init(canvas) -> f.start().
+  // F51.init preloads VFS assets and creates Graphics2D; f.start begins the rAF loop.
+  const f = new F51();
+  await f.init(canvas);
+  f.start();
+
+  // 4. Wire the AWT 1.0 event model onto DOM events.
+
+  // Keys that the game binds which also trigger default browser navigation/scroll actions.
+  // In Java, F51.init() calls setFocusTraversalKeysEnabled(false) so TAB does not move
+  // focus out of the canvas. In the browser, arrows scroll the page, Space scrolls down,
+  // and Tab moves focus. We preventDefault on these specific keys so long as modifier keys
+  // (Ctrl, Alt, Meta) are not held (preserving browser shortcuts like Ctrl+Tab, Alt+Left, etc.).
+  function isGameNavKey(code) {
+    return (
+      code === 9 ||                    // Tab
+      code === 32 ||                   // Space
+      code === EVENT_UP ||             // 1004 ArrowUp
+      code === EVENT_DOWN ||           // 1005 ArrowDown
+      code === EVENT_LEFT ||           // 1006 ArrowLeft
+      code === EVENT_RIGHT             // 1007 ArrowRight
+    );
+  }
+
+  // Auto-repeat: DOM fires repeated 'keydown' events when a key is held.
+  // In Java AWT, holding a key also produces repeated KEY_ACTION/keyDown events.
+  // We checked F51's key sets and verified they are idempotent (Set.add is a no-op if present).
+  // Special latches like `enterd` (in F51.keyDown for Enter/Esc) explicitly guard against
+  // multi-triggering while held, and jump requires u.jump === 0. Passing repeat events
+  // through matches Java AWT behavior.
+  function onKeyDown(e) {
+    const code = awtCode(e);
+    if (code === -1) return;
+
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (isGameNavKey(code)) {
+        e.preventDefault();
+      }
+    }
+    f.keyDown(null, code);
+  }
+
+  function onKeyUp(e) {
+    const code = awtCode(e);
+    if (code === -1) return;
+
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (isGameNavKey(code)) {
+        e.preventDefault();
+      }
+    }
+    f.keyUp(null, code);
+  }
+
+  // Blur: when the browser window or canvas loses focus (e.g. Alt-Tab or clicking away),
+  // clear input state so held keys do not remain stuck down.
+  function onBlur() {
+    f.lostFocus(null, null);
+  }
+
+  // Mouse: convert CSS client coordinates to 500x360 game canvas space.
+  // The game's mouseDown handler only uses this as "a click happened" to dismiss
+  // "Click here to Start/Continue" prompts and activate u.space when u.canclick is set.
+  function onMouseDown(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = rect.width > 0 ? Math.floor((e.clientX - rect.left) * (500 / rect.width)) : 0;
+    const y = rect.height > 0 ? Math.floor((e.clientY - rect.top) * (360 / rect.height)) : 0;
+    f.mouseDown(null, x, y);
+  }
+
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('blur', onBlur);
+  canvas.addEventListener('mousedown', onMouseDown);
+
+  return {
+    f,
+    stop() {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      canvas.removeEventListener('mousedown', onMouseDown);
+      f.stop();
+    },
+  };
+}
+```
+
+---
+
+### Browser vs. AWT Decisions and Rationale
+
+1. **AudioContext Unlock Requirement**:
+   - **Java AWT**: Could open and start `Clip` audio playback immediately at startup.
+   - **Browser**: Browsers require a user gesture before starting or resuming an `AudioContext`. `main.html` presents a click overlay (`#gesture`), and `boot(canvas)` immediately executes `audio.unlock()` in that click callback so audio streams and clips function from the very first frame.
+2. **500×360 Fixed Resolution vs. CSS Scaling**:
+   - **Java AWT**: Displayed a fixed 500×360 `Panel` inside a native `Frame`.
+   - **Browser**: `main.html` uses CSS (`min(100vw, calc(100vh * 500 / 360))`, `image-rendering: pixelated`) to scale the canvas responsively. `boot()` asserts the backing store is 500×360 without mutating it, guaranteeing coordinate fidelity.
+3. **Coordinate Transformation for Mouse Events**:
+   - **Java AWT**: Received `(x, y)` relative to the `Panel`'s physical dimensions (which matched internal 500×360 coordinates 1:1).
+   - **Browser**: DOM mouse events provide client coordinates. Coordinates are mapped via `canvas.getBoundingClientRect()`: `(clientX - left) * (500 / rect.width)` and `(clientY - top) * (360 / rect.height)` to convert from CSS viewport pixels to internal 500×360 game coordinates.
+4. **DOM `KeyboardEvent` Translation to AWT 1.0 Codes**:
+   - **Java AWT**: Passed deprecated AWT 1.0 `int` event codes (`1004`–`1007` for arrows, ASCII for printable chars).
+   - **Browser**: Handled using [`input.js`](file:///home/evan/resources/ra1/port/input.js)'s `awtCode(e)`. Unmapped codes (`-1`) are dropped.
+5. **Selective `preventDefault()` vs. `setFocusTraversalKeysEnabled(false)`**:
+   - **Java AWT**: Used `setFocusTraversalKeysEnabled(false)` so `TAB` did not cycle focus away from the game panel.
+   - **Browser**: `preventDefault()` is selectively invoked for bound game navigation/action keys (`Tab`, `Space`, and arrows `1004`–`1007`) when modifiers (`Ctrl`, `Alt`, `Meta`) are not held. This prevents page scroll and focus loss without blocking browser shortcuts (e.g. `Ctrl+R`, `F12`, `Alt+Left`).
+6. **Passing Auto-Repeat Through Unfiltered**:
+   - **Java AWT**: Holding down a key continuously emitted `Event.KEY_ACTION`/`keyDown`.
+   - **Browser**: `keydown` events fire repeatedly while a key is held. Verified that `F51.keyDown`'s `Set.add` calls are idempotent, and single-trigger latches (such as `enterd` for Enter/Esc and `u.jump === 0` for jump) manage state transitions internally. Passing repeat events directly matches Java's behavior.
+7. **Window `blur` -> `lostFocus` Mapping**:
+   - **Java AWT**: Component `lostFocus` triggered when switching windows.
+   - **Browser**: Listening to the window's `blur` event and routing to `f.lostFocus(null, null)` ensures keys do not remain latched down when alt-tabbing or unfocusing the window.
+
+---
+
+### Verification Commands & Results
+
+1. **Top-Level DOM Purity Verification**:
+   ```sh
+   node -e "import('/home/evan/resources/ra1/port/main.js').then(m=>console.log(Object.keys(m)))"
+   ```
+   **Output**:
+   ```
+   [ 'boot' ]
+   ```
+   *(Confirms clean module import without referencing DOM globals at top level).*
+
+2. **Syntax Validation**:
+   ```sh
+   node --check /home/evan/resources/ra1/port/main.js
+   ```
+   **Output**: Clean exit (code 0).
+
+3. **Port Test Suite**:
+   ```sh
+   cd /home/evan/resources/ra1/port && node --test
+   ```
+   **Output**:
+   ```
+   ℹ tests 129
+   ℹ suites 0
+   ℹ pass 129
+   ℹ fail 0
+   ℹ cancelled 0
+   ℹ skipped 0
+   ℹ todo 0
+   ℹ duration_ms 166.976341
+   ```
+
+---
+
+### Browser Troubleshooting Guide (`port/main.html`)
+
+When opening `http://localhost:8123/port/main.html` in a browser:
+
+#### 1. Wiring Failure Signs vs. Game Logic Failure Signs
+- **Wiring Failure**:
+  - **Screen stays on `#gesture` screen or red `#error` box appears immediately on click**: An unhandled exception escaped `boot()` (e.g. canvas dimension mismatch, asset fetch 404, or unhandled rejection).
+  - **Keys do not respond, or pressing Arrow keys / Space scrolls the page**: `keydown` listener or `preventDefault()` wiring issue in `main.js`.
+  - **Clicking does not dismiss the "Click here to Start" overlay**: `mousedown` event on canvas is not passing through or mouse coordinates are NaN/infinite.
+  - **Tabbing shifts focus away from the canvas to the browser address bar**: `Tab` preventDefault is not firing.
+  - **Audio stays silent even after clicking**: `audio.unlock()` was not invoked inside the user gesture handler.
+  - **Releasing a key leaves the plane turning/accelerating forever after an Alt-Tab**: `blur` event is not calling `f.lostFocus(null, null)`.
+
+- **Game Logic Failure**:
+  - **Graphics draw scrambled or missing polygon faces**: `Plane.d`, `ContO`, `Medium`, or depth sort logic inside `F51.run()`.
+  - **Menu buttons or textures are black/corrupted**: `xtGraphics` pixel-grabber image decoding.
+  - **Controls respond but physics/turning rates are erratic**: `Control.js` or `userCraft.js` physics tick logic.

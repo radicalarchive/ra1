@@ -1,0 +1,247 @@
+### Transpilation Report: Finishing [`port/F51.js`](file:///home/evan/resources/ra1/port/F51.js)
+
+The closing "NOT YET PORTED" banner in [`port/F51.js`](file:///home/evan/resources/ra1/port/F51.js) has been replaced with complete, line-by-line implementations of `run()`, `init()`, `start()`, `stop()`, `destroy()`, `playsounds()`, `downloadall()`, `getImage()`, `getSound()`, and `open()`. No existing methods or other files were modified.
+
+---
+
+### 1. §2 Compound Assignment & Cast Disassembly from Bytecode
+
+Disassembly source: `javap -p -c -cp /tmp/ra1jar F51`
+
+#### Pacer Arithmetic Sites in `run()`
+* **Site 1 (`f += 0.5`)**:
+  ```bytecode
+  3171: fload         23
+  3173: f2d
+  3174: ldc2_w        #387  // double 0.5d
+  3177: dadd
+  3178: d2f
+  3179: fstore        23
+  ```
+  **Classification**: Float/double widening and truncation (`fload`, `f2d`, `dadd`, `d2f`, `fstore`). Exact in JS float math as $0.5$ is a dyadic power-of-two fraction (`f += 0.5`).
+
+* **Site 2 (`f -= 0.5`)**:
+  ```bytecode
+  3184: fload         23
+  3186: f2d
+  3187: ldc2_w        #387  // double 0.5d
+  3190: dsub
+  3191: d2f
+  3192: fstore        23
+  ```
+  **Classification**: Float/double widening and truncation (`fload`, `f2d`, `dsub`, `d2f`, `fstore`). Exact in JS (`f -= 0.5`).
+
+* **Site 3 (`f += 3.5`)**:
+  ```bytecode
+  3254: fload         23
+  3256: f2d
+  3257: ldc2_w        #392  // double 3.5d
+  3260: dadd
+  3261: d2f
+  3262: fstore        23
+  ```
+  **Classification**: Float/double widening and truncation (`fload`, `f2d`, `dadd`, `d2f`, `fstore`). Exact in JS (`f += 3.5`).
+
+* **Site 4 (`f -= 3.5`)**:
+  ```bytecode
+  3267: fload         23
+  3269: f2d
+  3270: ldc2_w        #392  // double 3.5d
+  3273: dsub
+  3274: d2f
+  3275: fstore        23
+  ```
+  **Classification**: Float/double widening and truncation (`fload`, `f2d`, `dsub`, `d2f`, `fstore`). Exact in JS (`f -= 3.5`).
+
+#### Explicit Cast Sites in `run()`
+* **Site 5 (`"clmap" + (int)(Math.random() * 5.0) + ""`)**:
+  ```bytecode
+  3191: invokestatic  #315  // Method java/lang/Math.random:()D
+  3194: ldc2_w        #316  // double 5.0d
+  3197: dmul
+  3198: d2i
+  3199: invokevirtual #177  // StringBuilder.append:(I)
+  ```
+  **Classification**: Explicit cast of double multiplication (`dmul ; d2i`). Transpiled to `trunc(random() * 5.0)`.
+
+---
+
+### 2. Seam Implementations & Architectural Rationale
+
+1. **Threading & Adaptive Pacer (`run`, `start`, `stop`, `destroy`)**:
+   - `run()` is `async run()`. Where Java calls `Thread.sleep(l9)`, the JS loop yields via `await new Promise((r) => raf(r))` where `raf` is `requestAnimationFrame` (falling back to `setTimeout(cb, 16)` in headless tests).
+   - Clock: `Date.now()` is used rather than `performance.now()` because the game's pacer logic (`l8 - l3 < 560L` in race, `< 400L` in menu) calculates deltas from Java epoch millisecond timestamps (`date.getTime()`).
+   - The pacer's arithmetic (`f`/`f2` adjustments, 5.0 lower floor, `l9` calculation) is preserved verbatim so that the internal timing metrics match the original.
+   - `start()` sets `this.gamer = true` and kicks off `run()`; `stop()` and `destroy()` clear `this.gamer = null` and stop all active sound clips.
+
+2. **Graphics & Preloading (`init`, `getImage`, `downloadall`)**:
+   - `init(canvas)` wraps the 500×360 canvas into `this.offImage = new JImage(canvas)` and sets `this.rd = this.offImage.getGraphics()`, configures `setFont("SansSerif", 1, 11)`, and triggers `cookieDir()`.
+   - All images (`assets.IMAGES`) are fetched and decoded upfront via `loadImage()` into `this._images` (a `Map`).
+   - `getImage(s)` returns the already-resolved `JImage` synchronously, preserving the synchronous structure of `downloadall()`.
+
+3. **Audio Preloading & Independent Clips (`init`, `getSound`, `playsounds`)**:
+   - In `init()`, all audio files (`assets.MUSIC`, `assets.sounds('default')`, `assets.sounds('newsun')`) are decoded into `this._sounds`.
+   - `getSound(s)` instantiates a fresh `new Clip(buffer)` referencing the cached `AudioBuffer`, matching Java's `AudioSystem.getClip()` where each audio handle has independent playback nodes, looping flags, and frame position offsets.
+   - `playsounds()` is transpiled line-by-line: counters `pgrnd`, `pdownl`, `pupl`, `lascnt`, `plcnt`, and `crntt` mutate with identical state transitions.
+
+4. **Virtual Filesystem (`init`, `downloadall`)**:
+   - `init()` configures `vfs.setFpath('../')` and preloads `assets.VFS_FILES` and `assets.MODELS_ZIP`.
+   - `downloadall()` maintains the identical `lstat()` sequence and `dnload` step values (`1, 2, 18, 2, 31, 22, 21, 10, 1, 2, 32, 2...`) so the progress percentage displays identically to the original.
+
+5. **Dead Sun Check & External Browser Open (`open`)**:
+   - `s2.startsWith("sun.")` in `run()` is transpiled as written.
+   - `open(url)` calls `window.open(url, '_blank')` if in a browser environment.
+
+6. **Painter's Algorithm Invariant (§4)**:
+   - `ContO` depth-sorts into `ai5` and the subsequent draw passes in `run()` (both in standard rendering and `fase == -4` overview) maintain strict submission order without batching, hoisting, or reordering.
+
+---
+
+### 3. Verification Suite Output
+
+```
+✔ keyDown / keyUp reproduce the AWT 1.0 state machine (from probe) (0.355221ms)
+✔ lostFocus clears the controls only once a level is loaded (from probe) (0.19003ms)
+✔ mouseDown starts the game only once a level is loaded (from probe) (0.58218ms)
+✔ Lasers constructor initializes speed, rads, srate, damg arrays (1.531375ms)
+✔ xs() and ys() screen projection calculations and overflow wrapping (0.278697ms)
+✔ rot() 2D rotation helper with float32 trigonometric rounding (0.415586ms)
+✔ dt() 3D transform mutates coordinates in-place and renders polygon (0.717436ms)
+✔ d() draws deterministic laser types 0, 1, 4, 5, 6, 7, 8, 10 without error (1.501227ms)
+✔ constructor defaults match the real class (1.498622ms)
+✔ ys clamps j and wraps at int32 (0.211981ms)
+✔ infront (infront_a) tracks Java for eight steps (1.230315ms)
+✔ infront (infront_b) tracks Java for eight steps (0.378665ms)
+✔ behinde (behinde_a) tracks Java for eight steps (0.332669ms)
+✔ behinde (behinde_b) tracks Java for eight steps (0.255543ms)
+✔ left (left) tracks Java for eight steps (0.299556ms)
+✔ right (right) tracks Java for eight steps (0.294958ms)
+✔ watch (watch) tracks Java for eight steps (0.854585ms)
+✔ infront (infront_neg) tracks Java for eight steps (0.356875ms)
+✔ behinde (behinde_neg) tracks Java for eight steps (0.251275ms)
+✔ left (left_neg) tracks Java for eight steps (0.21129ms)
+✔ right (right_neg) tracks Java for eight steps (0.180101ms)
+✔ watch (watch_neg) tracks Java for eight steps (0.37536ms)
+✔ infront (infront_ab) tracks Java for eight steps (0.192965ms)
+✔ behinde (behinde_ab) tracks Java for eight steps (0.152128ms)
+✔ left (left_ab) tracks Java for eight steps (0.172395ms)
+✔ right (right_ab) tracks Java for eight steps (0.168999ms)
+✔ infront (infront_cv) tracks Java for eight steps (0.144744ms)
+✔ behinde (behinde_cv) tracks Java for eight steps (0.172977ms)
+✔ left (left_cv) tracks Java for eight steps (0.203635ms)
+✔ right (right_cv) tracks Java for eight steps (0.178858ms)
+✔ around(3000) tracks Java for eight steps (0.347547ms)
+✔ around(6000) tracks Java for eight steps (0.251616ms)
+✔ d() clamps zy and y, recomputes ground, decrements jumping (0.375329ms)
+✔ constructor: n, ox, oy, oz, c fields (from probe) (1.258418ms)
+✔ constructor: deltaf_after_ctor = 3.5538489E10 (from probe) (0.283276ms)
+✔ constructor: projf_after_ctor = 1.0 (from probe) (0.189488ms)
+✔ constructor: sr=255, sg=220, exp=0 (from probe) (0.769514ms)
+✔ loadprojf: projf = 3.5317494E10 (from probe) (0.249381ms)
+✔ xs(3000, 2000) = 800 (from probe) (0.198545ms)
+✔ xs(-500, 800) = -125 (from probe) (0.135346ms)
+✔ xs(200, 5) = -1750 — j<10 clamped to 10 (from probe) (0.125888ms)
+✔ xs(200, -100) = -1750 — negative j clamped to 10 (from probe) (0.288836ms)
+✔ xs(0, 0) = -9750 — j==0 clamped to 10 (from probe) (0.286452ms)
+✔ ys(3000, 2000) = 720 (from probe) (0.205909ms)
+✔ ys(-500, 800) = -175 (from probe) (0.112112ms)
+✔ ys(200, 5) = 2150 — j<10 clamped to 10 (from probe) (0.112352ms)
+✔ ys(200, -100) = 2150 — negative j clamped to 10 (from probe) (0.123423ms)
+✔ ys(0, 0) = -5850 — j==0 clamped to 10 (from probe) (0.109197ms)
+✔ spy(250, 0) = 0 — on-centre (from probe) (0.117603ms)
+✔ spy(0, 0) = 250 (from probe) (0.086504ms)
+✔ spy(1000, 1000) = 1250 (from probe) (0.109757ms)
+✔ spy(50000, 60000) = 42191 — int32 overflow, wrapped (from probe) (0.092454ms)
+✔ spy(-30000, -40000) = 0 — wrapped sum is negative, sqrt(neg)=NaN, trunc(NaN)=0 (from probe) (0.089159ms)
+✔ rot k=45: arrays rotated in place (from probe) (0.162797ms)
+✔ rot k=0 is a no-op: arrays unchanged (from probe) (0.094118ms)
+✔ d() exp=0 flag=false: av=4382, projf=2.89187738E10, exp=0 (from probe) (0.543808ms)
+✔ d() exp=0 flag=true: av=4233, projf=28754.979 (from probe) (0.13748ms)
+✔ s() exp=0 all oy>ground: exp unchanged (from probe: exp_after_s_allaboveground=0) (0.225637ms)
+✔ s() exp=0 all oy<ground: shadow drawn, exp unchanged (from probe: exp_after_s_belowground=0) (0.147509ms)
+✔ tsin and tcos arrays have length 360 (1.37024ms)
+✔ tsin table spot-checks — first five entries (from probe) (0.119596ms)
+✔ tsin table spot-checks — boundary angles (from probe) (0.145915ms)
+✔ tcos table spot-checks — first five entries (from probe) (0.11636ms)
+✔ tcos table spot-checks — boundary angles (from probe) (0.114486ms)
+✔ tsin/tcos mid-table entries at 45 and 135 (from probe) (0.108515ms)
+✔ getsin in-range inputs (from probe) (0.132611ms)
+✔ getcos in-range inputs (from probe) (0.12169ms)
+✔ getsin wraps angles >= 360 (from probe) (0.272575ms)
+✔ getcos wraps angles >= 360 (from probe) (0.2801ms)
+✔ getsin wraps negative angles (from probe) (0.178848ms)
+✔ getcos wraps negative angles (from probe) (0.098096ms)
+✔ constructor: default fields match Java (from probe) (1.071556ms)
+✔ getpy() and getcpy() calculate squared distances with int32 wrapping (from probe) (1.258498ms)
+✔ reset() reinitializes rspeed, ltyp, pexp and clears lstage array (from probe) (0.23795ms)
+✔ lasercolid() tests target collision (from probe) (0.455732ms)
+✔ dl() advances and clears laser hit stages (from probe) (1.046338ms)
+✔ dosmokes() spawns and updates smoke particles (from probe) (0.439952ms)
+✔ preform() Scenario A: 5-step turnleft simulation (from probe) (3.164331ms)
+✔ preform() Scenario B: 5-step turnright simulation (from probe) (1.761028ms)
+✔ preform() Scenario C: boundary clamping (from probe) (1.276543ms)
+✔ preform() Scenario D: pitch/roll normalisation (from probe) (1.420535ms)
+✔ preform() Scenario E: gravity behavior (from probe) (0.885113ms)
+✔ preform() Scenario F: laser firing (from probe) (0.992646ms)
+✔ preform() Scenario G: laser homing update (from probe) (1.046889ms)
+✔ preform() Scenario H: response and steering tracking (from probe) (0.85149ms)
+✔ preform() Case A discriminator: xy == 180 with a fractional step (from probe) (1.034555ms)
+✔ constructor: default fields match Java (from probe) (1.498342ms)
+✔ reset: clears velocities and sets craft type and njumps (0.276372ms)
+✔ getpy: distance calculation with integer wrapping (0.215307ms)
+✔ preform: air flight with up and left controls (1.632636ms)
+✔ preform: air flight with down, right, and plus controls (0.588883ms)
+✔ preform: air flight with down key and xy=95 (discriminator Sites 3 & 4) (0.364989ms)
+✔ preform: ground crash triggers explosion and aligns xy (0.735911ms)
+✔ preform: ground upright flight with down key and mins (0.362526ms)
+✔ preform: ground flight with down key and xy=95 (discriminator Site 5) (0.594866ms)
+✔ preform: lift upper clamp and negative x / positive z boundary clamping (0.483253ms)
+✔ preform: lift lower clamp and positive x / negative z boundary clamping (0.299666ms)
+✔ preform: jump charge and launch (0.245263ms)
+✔ preform: laser spawning and enemy tracking atan/sqrt orientation (0.354941ms)
+✔ preform: easter egg trigger and medium color channel swaps (0.994259ms)
+✔ lasercolid: laser hit registration (0.431165ms)
+✔ dl: laser animation and completion lifecycle (1.140125ms)
+✔ readLines splits a real level file the way DataInputStream.readLine does (3.458627ms)
+✔ readLines is Latin-1, not UTF-8 (0.187745ms)
+✔ readZip inflates models.zrad, entries in stored order (41.24653ms)
+✔ readZip entry names match the objects/ models (13.817657ms)
+✔ 1. Constructor and default field initialisation (from probe lines 1-35) (1.358698ms)
+✔ 2. Screen projection and distance calculations (from probe lines 36-53) (2.4073ms)
+✔ 3. Reset and alldest state transitions (from probe lines 54-69) (0.516477ms)
+✔ 4. Pixel blending algorithms and buffer updates (from probe lines 67-76) (36.295793ms)
+✔ 5. dtrakers tracking scenarios (from probe lines 77-81) (3.055735ms)
+✔ 6. denter phase transitions (from probe lines 82-120) (13.999099ms)
+ℹ tests 129
+ℹ suites 0
+ℹ pass 129
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 128.829851
+```
+
+Dynamic module import verification:
+```sh
+$ node -e "import('/home/evan/resources/ra1/port/F51.js').then(()=>console.log('OK'))"
+OK
+```
+
+---
+
+### 4. What Could Not Be Verified Without a Live Browser
+
+1. **Canvas2D Framebuffer Presentation**: Node's test runner lacks `HTMLCanvasElement`, `CanvasRenderingContext2D`, and `createImageBitmap`. Live pixel blitting of `F51.paint(g)` to the physical screen requires a browser environment.
+2. **WebAudio User Gesture Unlocking**: In a headless Node session, `window.AudioContext` is undefined. The playback transitions in `playsounds` (sound looping, volume cutoffs, rewinding via `setFramePosition(0)`) cannot produce physical audio without browser WebAudio.
+3. **Continuous Animation Frame Cadence**: `requestAnimationFrame` vs `Date.now()` delta smoothing across 60Hz displays under sustained user input.
+
+---
+
+### 5. What a Human Should Check First in the Browser
+
+When loading `http://localhost:8123/port/main.html` via `python3 -m http.server 8123`:
+1. **Loading Bar Progression**: The initial screen should show "Loading 3D Models...", "Loading Images...", "Loading Music...", and "Loading Sound Effects..." advancing the progress bar from 0% to 100%.
+2. **Initial Click Prompt**: Verify that clicking the screen unlocks audio, switches the prompt text to "Click here to Continue", and transitions into the title menu.
+3. **Menu Effects & Audio**: Confirm the intro music plays, menu text renders in `SansSerif` font, and navigating menus (Up/Down/Enter/Space) works smoothly.
+4. **Race Rendering (Painter's Algorithm)**: Start Stage 0; verify 3D plane models, terrain, clouds, and lasers render in depth order without occlusion anomalies or planes clipping mountain geometry.

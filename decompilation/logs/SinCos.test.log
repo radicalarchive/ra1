@@ -1,0 +1,88 @@
+=== agy_ra1 ===================================================
+phase   : test
+class   : SinCos
+writes  : /home/evan/resources/ra1/port/SinCos.test.js
+model   : claude-sonnet-4-6   (effort high, timeout 45m)
+===============================================================
+Let me read all the required files before writing a single line of code.
+Now let me read the java.js helper library and a reference test file from nfm:
+Now let me check the probe source to understand the exact probe structure:
+I now have everything I need. Let me analyze the probe output carefully before writing the test.
+
+**Analysis of probe output:**
+
+The probe values use Java's `float` `toString()` format (e.g., `0.017452406`, `1.2246469E-16`). In JavaScript, `Float32Array` reads return JS doubles that are exactly the float32 value, but `toString()` will produce different strings. The test must use `strictEqual` on the **numeric values** themselves.
+
+The key question: can I use `strictEqual` on these floats? The probe prints Java's `Float.toString()` which prints enough digits to round-trip the float32. I need to compare the exact float32 bit-pattern.
+
+The values like `0.017452406` are Java `float` printed values. JavaScript's `Math.fround(Math.sin(1 * 0.017453292519943295))` should produce the same float32. Since `Float32Array` stores do the same rounding as Java's `(float)` cast, the values should match bit-for-bit.
+
+For the test, I'll use `strictEqual` with the exact numeric values from the probe. Since `Float32Array` reads return a JS number that is the exact float32, and Java's printed value is what round-trips back to that float32, I can parse the probe strings to get the comparison values.
+
+Let me verify the math for a couple of entries:
+- `tsin[0]` = `0.0` — `Math.fround(Math.sin(0)) = 0` ✓
+- `tsin[90]` = `1.0` — `Math.fround(Math.sin(90 * π/180)) = 1` ✓  
+- `tsin[180]` = `1.2246469E-16` — `Math.fround(Math.sin(π)) = Math.fround(1.2246467991473532e-16)`
+
+Let me think: `Math.fround(1.2246467991473532e-16)` = ? The nearest float32 to `1.2246...e-16`. The probe says `1.2246469E-16`. In JavaScript, `Math.fround(1.2246467991473532e-16)` should give `1.2246468525593e-16` or similar. But the probe says `1.2246469E-16`. Java prints `1.2246469E-16` which means the float32 value is `1.2246469E-16` (to 8 significant digits). This is what `Float32Array` will store and return.
+
+For `strictEqual`, since both Java and JS Float32Arrays produce the same float32 bit pattern, comparing with `===` (which `strictEqual` uses) should work perfectly.
+
+The numbers from the probe are Java's printed representation of `float` values. I need to use exactly those numeric values in JavaScript. For example, `1.2246469E-16` in JS is `1.2246469e-16`. 
+
+Now I'll write the test:
+Now let me verify `SinCos.js` is correct by carefully cross-checking against the probe values. The critical question is whether `Math.fround(1.2246469e-16)` equals the float32 value Java printed as `1.2246469E-16`. Java's `Float.toString()` prints the minimum number of digits needed to uniquely identify the float32. The probe value `1.2246469E-16` is the Java float `tsin[180]`, and `Math.fround(Math.sin(180 * 0.017453292519943295))` should produce the same float32. Since `SinCos.js` uses `Float32Array`, each store is identical to Java's `(float)` cast. The values will match.
+
+Let me also verify `SinCos.js` has no bugs by checking the `-1081` case: `-1081 + 360 = -721`, `-721 + 360 = -361`, `-361 + 360 = -1`, `-1 + 360 = 359`. Probe says `getsin(-1081) = -0.017452406` which is `tsin[359]`. Correct — the while loop in `getsin` keeps adding 360 until `i >= 0`. `SinCos.js` faithfully replicates this. ✓
+
+The `SinCos.js` implementation looks correct. No changes needed.
+
+---
+
+## Report
+
+### What was asserted
+
+Every value from `SinCos.probe.txt` is asserted with `strictEqual`:
+
+| Block | Lines asserted |
+|---|---|
+| `tsin.length`, `tcos.length` | 2 |
+| `tsin[0..4]` (first 5 entries) | 5 |
+| `tsin[90,180,270,359]` (boundary angles) | 4 |
+| `tcos[0..4]` (first 5 entries) | 5 |
+| `tcos[90,180,270,359]` (boundary angles) | 4 |
+| `tsin[45]`, `tcos[45]`, `tsin[135]`, `tcos[135]` (mid-table) | 4 |
+| `getsin(0,90,180,270,359)` in-range | 5 |
+| `getcos(0,90,180,270,359)` in-range | 5 |
+| `getsin(360,450,720,1441)` — `>= 360` branch | 4 |
+| `getcos(360,450,720,1441)` — `>= 360` branch | 4 |
+| `getsin(-1,-90,-359,-360,-720,-1081)` — negative branch | 6 |
+| `getcos(-1,-90,-359,-360,-720,-1081)` — negative branch | 6 |
+| **Total** | **54** |
+
+Non-`0.0`, non-`1.0`, non-`-1.0` float values are compared via `Math.fround(literalFromProbe)` to recover the exact float32 bit-pattern — identical to what `Float32Array` stores and what Java's `(float)` cast produces.
+
+### What was excluded and why
+
+**Nothing was excluded.** The probe source explicitly states: *"SinCos contains no Math.random() calls and no non-deterministic paths. There are no NONDETERMINISTIC outputs below."* Every probe line is asserted.
+
+### §2 compound-assignment audit
+
+`SinCos.java` contains `i -= 360` and `i += 360`. Both operands (`i`, `360`) are pure `int`. There is no float anywhere in the expression, so no `+= (int)(` pattern exists and no §2/§2b analysis is needed. No §2 sites in this file.
+
+### Changes to `SinCos.js`
+
+**None.** The existing transpilation is correct:
+- `floatArray(360)` → `Float32Array(360)`: every store rounds to float32, matching Java's `(float)Math.cos(...)`.
+- `i * 0.017453292519943295` is `int × double → double` in both Java and JS; no `fr()` needed on the intermediate.
+- The `while (i >= 360) i -= 360` and `while (i < 0) i += 360` loops are faithfully reproduced.
+- Return of `this.tsin[i]` / `this.tcos[i]` from a `Float32Array` returns a JS double that is the exact float32 value, matching Java's `float` return.
+
+### Values I could not explain
+
+None. All probe values are consistent with the code path.
+
+### What is NOT covered
+
+The probe spot-checks 14 of the 360 table entries (indices 0–4, 45, 90, 135, 180, 270, 359). The remaining 346 entries are not asserted — the probe itself made this scope decision. This is noted here explicitly as required by §7.

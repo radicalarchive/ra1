@@ -1,0 +1,104 @@
+=== agy_ra1 ===================================================
+phase   : port
+class   : SinCos
+writes  : /home/evan/resources/ra1/port/SinCos.js and /home/evan/resources/ra1/port/tools/SinCosProbe.java
+model   : claude-sonnet-4-6   (effort high, timeout 45m)
+===============================================================
+Let me read everything I need before writing a single line.
+Now let me look at the NFM SinCos.js as a style reference, and check the port directory structure:
+I now have everything I need. Let me analyze SinCos.java thoroughly before writing anything.
+
+**Analysis of SinCos.java:**
+
+1. **Fields:** `float[] tcos` and `float[] tsin` — both `float[]`, use `floatArray(360)`
+2. **Constructor:** Two `do/while` loops building cos/sin tables. The angle computation `i * 0.017453292519943295` uses a **double literal** → double arithmetic → no `fr()` needed on the intermediate. The outer `(float)` cast is explicit → `fr()` or just let Float32Array store it.
+3. **`getsin(i)` / `getcos(i)`:** Normalize `i` into `[0,360)` via while loops, return table value. The return type is `float` (from the `float[]` array). In JS, reading from a `Float32Array` already returns a float32-rounded double.
+4. **Compound assignments:** `i -= 360` and `i += 360` — both pure int arithmetic (no float anywhere). No `+= (int)(` pattern at all. No §2 sites.
+5. **§2b:** `i * 0.017453292519943295` — `i` is `int` but the right side is `double`, result is `double`. No int overflow concern here.
+6. **§3 (preserved bugs):** None visible — no `(int)` casts of float literals.
+7. **§5a throws:** No string indexing or parseInt here.
+
+The double literal `0.017453292519943295` (π/180) ensures the table is built in double precision, then cast to float32 on store into the `Float32Array`. That matches Java's `(float)Math.cos(i * 0.017453292519943295)`.
+
+Now I'll grep to confirm there are NO `+= (int)(` patterns in SinCos.java:
+Good — zero compound-assignment sites with `(int)(`. Now I'll write the two files.
+Now write the probe:
+Now write the probe:
+Both files are written. Here is the full report.
+
+---
+
+## Report
+
+### Files produced
+
+- [`port/SinCos.js`](file:///home/evan/resources/ra1/port/SinCos.js)  
+- [`port/tools/SinCosProbe.java`](file:///home/evan/resources/ra1/port/tools/SinCosProbe.java)
+
+---
+
+### §2 Compound-assignment audit
+
+**Grep for `+= (int)(` and `-= (int)(` in `SinCos.java`: zero hits.**
+
+The only compound assignments in the file are:
+
+| Site | Java | Types | Classification |
+|------|------|-------|---------------|
+| `getsin` loop | `i -= 360` | `int -= int` | **No §2 issue** — pure int arithmetic, no float anywhere |
+| `getsin` loop | `i += 360` | `int += int` | **No §2 issue** — pure int arithmetic, no float anywhere |
+| `getcos` loop | `i -= 360` | `int -= int` | **No §2 issue** — same |
+| `getcos` loop | `i += 360` | `int += int` | **No §2 issue** — same |
+
+Neither pattern has `(int)(` on the right-hand side. No §2/Case-A rewriting needed, no disassembly required, **confidence: certain**.
+
+---
+
+### Fields touched with their declared Java types
+
+| Field | Java declared type | JS representation |
+|-------|--------------------|-------------------|
+| `this.tcos` | `float[]` | `floatArray(360)` → `Float32Array` |
+| `this.tsin` | `float[]` | `floatArray(360)` → `Float32Array` |
+
+---
+
+### §2b int-overflow audit
+
+The only potential concern is `i * 0.017453292519943295`. The left operand `i` is `int` (max 359 in the loop, but also negative in `getsin`/`getcos`). The right operand is a `double` literal → Java promotes `i` to `double` before multiplying → result is `double`. **No int overflow possible here. No `Math.imul` or `i32()` needed.** The `i -= 360` / `i += 360` operations on a value bounded well within `int` range also cannot overflow.
+
+---
+
+### Preserved bugs (§3)
+
+**None** — `SinCos.java` contains no `(int)` casts of float literals, no dead stores, no unreachable branches, no off-by-ones to preserve.
+
+---
+
+### Float32 semantics (§1)
+
+The constructor stores `Math.cos(i * 0.017453292519943295)` into a `Float32Array`. In Java, `(float)Math.cos(...)` rounds a `double` to `float32` with `round-to-nearest-even`. Assigning a JS `double` into a `Float32Array` slot uses the same rounding mode (IEEE 754). The values will be bit-identical.
+
+`getsin()` and `getcos()` read from `Float32Array` — the returned JS number is the float32 value widened to double, which is the same number Java's `float` widens to `double`. **No `fr()` call is needed inside these methods.** Callers that use the returned value in arithmetic **must** wrap each binary op in `fr()` (§1 of the spec, already documented in the file header).
+
+---
+
+### Uncertainties and places I was unsure
+
+1. **`++i` pre-increment in `while (++i < 360)` vs post-increment:** Java's `++i` is pre-increment; JS `++i` in a `while` condition is also pre-increment. Correct as written.
+
+2. **`Float32Array` read precision:** I rely on the JS specification that reading from a `Float32Array` returns the stored float32 value converted to a double without further rounding. This is guaranteed by the ECMAScript spec. The values should be bit-identical to Java's `float` array reads.
+
+3. **`getsin`/`getcos` return type in JS:** The return type in Java is `float`. In JS there is no `float` type; returning a `Float32Array` element returns a double that holds the nearest float32 value. I do **not** wrap the return in `fr()` because that would double-round unnecessarily (the value is already float32-exact). This is consistent with the NFM port's SinCos usage pattern.
+
+---
+
+### What the probe does NOT cover
+
+1. **The full 360-entry table bit-for-bit** — the probe spot-checks 14 entries from `tsin` and 14 from `tcos` (indices 0–4, 45, 90, 135, 180, 270, 359). Entries at indices 6–44, 46–89, 91–134, 136–179, 181–269, 271–358 are not individually verified. If there is a systematic offset error (e.g., initialising from index 1 instead of 0) the spot checks at 0 and 1 would catch it. If there is an arithmetic bug affecting only a band of angles, it might slip through.
+
+2. **Integer overflow in the normalisation loops for very large magnitude inputs** (e.g., `Integer.MAX_VALUE`). The while-loops would spin for ~6 million iterations; not probed. Practical game inputs are bounded (the caller controls the angle from a rotation counter), so this is an academic gap.
+
+3. **Multi-object interaction** — `SinCos` has no collaborators; it is fully self-contained. There is nothing upstream or downstream to probe.
+
+4. **No NONDETERMINISTIC section** — `SinCos` contains no calls to `Math.random()` or any non-deterministic API. Every output is deterministic from the inputs; the entire probe output can be asserted as literals.

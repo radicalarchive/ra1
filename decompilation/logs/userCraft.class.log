@@ -1,0 +1,76 @@
+=== agy_ra1 ===================================================
+phase   : class
+class   : userCraft
+writes  : /home/evan/resources/ra1/port/userCraft.js, /home/evan/resources/ra1/port/tools/userCraftProbe.java and /home/evan/resources/ra1/port/userCraft.test.js
+model   : gemini-3.7-flash-medium   (effort high, timeout 45m)
+===============================================================
+### Transpilation Summary: `userCraft.java` $\rightarrow$ `userCraft.js`
+
+#### 1. Compound Assignment Sites Classification (§2)
+
+All 14 compound assignment sites in `userCraft.class` (`preform()`) were analyzed via bytecode disassembly (`javap -p -c -cp /tmp/ra1jar userCraft`) and verified as **Case B** (LHS is not widened with `i2f`/`i2d`; RHS is evaluated, truncated with `f2i`/`d2i`, and added/subtracted with `iadd`/`isub`):
+
+1. **Site 1 (`preform` L60)**: `conto.zy -= (int)((4 + this.elev[this.ltyp]) * conto.m.cs.getcos(conto.xy))`
+   - Bytecode offsets: `66 getfield` $\dots$ `96 f2i`, `97 isub`, `98 putfield`
+   - **Case B** $\rightarrow$ `conto.zy -= trunc(fr((4 + this.elev[this.ltyp]) * conto.m.cs.getcos(conto.xy)))`
+2. **Site 2 (`preform` L61)**: `conto.xz += (int)(byte0 * (2 + this.elev[this.ltyp]) * conto.m.cs.getsin(conto.xy))`
+   - Bytecode offsets: `103 getfield` $\dots$ `136 f2i`, `137 iadd`, `138 putfield`
+   - **Case B** $\rightarrow$ `conto.xz += trunc(fr(Math.imul(byte0, 2 + this.elev[this.ltyp]) * conto.m.cs.getsin(conto.xy)))`
+3. **Site 3 (`preform` L64)**: `conto.zy += (int)((4 + this.elev[this.ltyp]) * conto.m.cs.getcos(conto.xy))`
+   - Bytecode offsets: `162 getfield` $\dots$ `190 f2i`, `191 iadd`, `192 putfield`
+   - **Case B** $\rightarrow$ `conto.zy += trunc(fr((4 + this.elev[this.ltyp]) * conto.m.cs.getcos(conto.xy)))`
+4. **Site 4 (`preform` L65)**: `conto.xz -= (int)(byte0 * (2 + this.elev[this.ltyp]) * conto.m.cs.getsin(conto.xy))`
+   - Bytecode offsets: `183 getfield` $\dots$ `201 f2i`, `202 isub`, `203 putfield`
+   - **Case B** $\rightarrow$ `conto.xz -= trunc(fr(Math.imul(byte0, 2 + this.elev[this.ltyp]) * conto.m.cs.getsin(conto.xy)))`
+5. **Site 5 (`preform` L107)**: `conto.zy += (int)(5.0f * conto.m.cs.getcos(conto.xy))`
+   - Bytecode offsets: `589 getfield` $\dots$ `609 f2i`, `610 iadd`, `611 putfield`
+   - **Case B** $\rightarrow$ `conto.zy += trunc(fr(5.0 * conto.m.cs.getcos(conto.xy)))`
+   - *(Note: On reachable execution paths, `conto.xy` is normalized to `0` or `180` before this check, making `5.0 * cos(xy)` always evaluate to $\pm 5$ integer).*
+6. **Site 6 (`preform` L142)**: `conto.y -= (int)this.lift`
+   - Bytecode offsets: `931 getfield`, `935 getfield lift:D`, `938 d2i`, `939 isub`, `940 putfield`
+   - **Case B** $\rightarrow$ `conto.y -= trunc(this.lift)`
+7. **Site 7 (`preform` L217)**: `conto.xz += (int)(Math.random() * (this.speed / 10.0f) - this.speed / 20.0f)`
+   - Bytecode offsets: `1377 getfield` $\dots$ `1401 d2i`, `1402 iadd`, `1403 putfield`
+   - **Case B** $\rightarrow$ `conto.xz += trunc(random() * (this.speed / 10.0) - this.speed / 20.0)`
+8. **Site 8 (`preform` L218)**: `conto.zy += (int)(Math.random() * (this.speed / 10.0f) - this.speed / 20.0f)`
+   - Bytecode offsets: `1408 getfield` $\dots$ `1432 d2i`, `1433 iadd`, `1434 putfield`
+   - **Case B** $\rightarrow$ `conto.zy += trunc(random() * (this.speed / 10.0) - this.speed / 20.0)`
+9. **Site 9 (`preform` L309)**: `lx[n] -= (int)(this.lspeed[j3] * (conto.m.cs.getsin(this.lxz[j3]) * conto.m.cs.getcos(this.lzy[j3])))`
+   - Bytecode offsets: `2242 iaload` $\dots$ `2287 f2i`, `2288 isub`, `2289 iastore`
+   - **Case B** $\rightarrow$ `lx[n] -= trunc(fr(this.lspeed[j3] * fr(conto.m.cs.getsin(this.lxz[j3]) * conto.m.cs.getcos(this.lzy[j3]))))`
+10. **Site 10 (`preform` L312)**: `lz[n2] += (int)(this.lspeed[j3] * (conto.m.cs.getcos(this.lxz[j3]) * conto.m.cs.getcos(this.lzy[j3])))`
+    - Bytecode offsets: `2274 iaload` $\dots$ `2294 f2i`, `2295 iadd`, `2296 iastore`
+    - **Case B** $\rightarrow$ `lz[n2] += trunc(fr(this.lspeed[j3] * fr(conto.m.cs.getcos(this.lxz[j3]) * conto.m.cs.getcos(this.lzy[j3]))))`
+11. **Site 11 (`preform` L315)**: `ly[n3] -= (int)(this.lspeed[j3] * conto.m.cs.getsin(this.lzy[j3]))`
+    - Bytecode offsets: `2305 iaload` $\dots$ `2317 f2i`, `2318 isub`, `2319 iastore`
+    - **Case B** $\rightarrow$ `ly[n3] -= trunc(fr(this.lspeed[j3] * conto.m.cs.getsin(this.lzy[j3])))`
+12. **Site 12 (`preform` L334)**: `conto.x -= (int)(this.speed * (conto.m.cs.getsin(conto.xz) * conto.m.cs.getcos(conto.zy)))`
+    - Bytecode offsets: `2460 getfield` $\dots$ `2497 f2i`, `2498 isub`, `2499 putfield`
+    - **Case B** $\rightarrow$ `conto.x -= trunc(fr(this.speed * fr(conto.m.cs.getsin(conto.xz) * conto.m.cs.getcos(conto.zy))))`
+13. **Site 13 (`preform` L335)**: `conto.z += (int)(this.speed * (conto.m.cs.getcos(conto.xz) * conto.m.cs.getcos(conto.zy)))`
+    - Bytecode offsets: `2504 getfield` $\dots$ `2541 f2i`, `2542 iadd`, `2543 putfield`
+    - **Case B** $\rightarrow$ `conto.z += trunc(fr(this.speed * fr(conto.m.cs.getcos(conto.xz) * conto.m.cs.getcos(conto.zy))))`
+14. **Site 14 (`preform` L336)**: `conto.y -= (int)(this.speed * conto.m.cs.getsin(conto.zy))`
+    - Bytecode offsets: `2548 getfield` $\dots$ `2570 f2i`, `2571 isub`, `2572 putfield`
+    - **Case B** $\rightarrow$ `conto.y -= trunc(fr(this.speed * conto.m.cs.getsin(conto.zy)))`
+
+---
+
+#### 2. Probe & Determinism
+
+- Probe created at [`userCraftProbe.java`](file:///home/evan/resources/ra1/port/tools/userCraftProbe.java).
+- Compiled and executed against `ra1.jar`. Outputs verified across back-to-back runs; log saved to [`userCraft.probe.txt`](file:///home/evan/resources/ra1/decompilation/logs/userCraft.probe.txt).
+
+---
+
+#### 3. Test Verification & Mutation Testing
+
+- Test suite created at [`userCraft.test.js`](file:///home/evan/resources/ra1/port/userCraft.test.js).
+- **Unit Tests**: 16/16 tests pass (`node --test userCraft.test.js`).
+- **Full Suite**: 116/116 tests pass across `/home/evan/resources/ra1/port`.
+- **Mutation Testing**:
+  - Mutating Sites 1 & 2 to Case A $\rightarrow$ test `air1` fails (`49 !== 50`).
+  - Mutating Sites 3 & 4 to Case A $\rightarrow$ test `air3` fails (`-3 !== -2`).
+  - Mutating Site 6 to Case A $\rightarrow$ test `wep` fails (`35 !== 36`).
+  - Mutating Sites 9, 10, 11 to Case A $\rightarrow$ test `wep` fails (`829 !== 830`).
+  - Mutating Sites 12, 13, 14 to Case A $\rightarrow$ 6 tests fail (`air2`, `air3`, `gnd1`, `gnd2`, `gnd3`, `bnd2`).

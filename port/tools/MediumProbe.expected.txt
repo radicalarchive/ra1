@@ -1,0 +1,188 @@
+ctor = x=3000 y=-1000 z=-2000 xz=0 zy=0 tart=0 yart=-100 focus_point=400 ground=250 cx=250 cy=150 cz=50 w=500 h=360 adv=-500
+ys(250, 70000) = 151
+ys(0, 0) = -5850
+ys(-500, 800) = -175
+ys(200, 5) = 2150
+ys(-2000000, 49000) = -2032182
+ys(1000000, 70000) = 987571
+infront_a.step1 = x=3099 y=-1557 z=2935 xz=-225 zy=30 tart=0 yart=-100
+infront_a.step2 = x=3165 y=-1743 z=4580 xz=-225 zy=30 tart=0 yart=-100
+infront_a.step3 = x=3209 y=-1805 z=5128 xz=-225 zy=30 tart=0 yart=-100
+infront_a.step4 = x=3238 y=-1825 z=5311 xz=-225 zy=30 tart=0 yart=-100
+infront_a.step5 = x=3257 y=-1832 z=5372 xz=-225 zy=30 tart=0 yart=-100
+infront_a.step6 = x=3270 y=-1834 z=5392 xz=-225 zy=30 tart=0 yart=-100
+infront_a.step7 = x=3279 y=-1835 z=5399 xz=-225 zy=30 tart=0 yart=-100
+infront_a.step8 = x=3285 y=-1835 z=5401 xz=-225 zy=30 tart=0 yart=-100
+infront_b.step1 = x=3018 y=-1030 z=2464 xz=-170 zy=-20 tart=60 yart=-34
+infront_b.step2 = x=3025 y=-1067 z=3949 xz=-210 zy=-20 tart=100 yart=10
+infront_b.step3 = x=3027 y=-1098 z=4442 xz=-236 zy=-20 tart=126 yart=40
+infront_b.step4 = x=3027 y=-1121 z=4604 xz=-254 zy=-20 tart=144 yart=60
+infront_b.step5 = x=3025 y=-1137 z=4658 xz=-266 zy=-20 tart=156 yart=73
+infront_b.step6 = x=3023 y=-1148 z=4675 xz=-274 zy=-20 tart=164 yart=82
+infront_b.step7 = x=3021 y=-1156 z=4680 xz=-279 zy=-20 tart=169 yart=88
+infront_b.step8 = x=3019 y=-1160 z=4682 xz=-282 zy=-20 tart=172 yart=92
+behinde_a.step1 = x=3384 y=-1091 z=2365 xz=-45 zy=-30 tart=0 yart=-100
+behinde_a.step2 = x=3640 y=-1121 z=3820 xz=-45 zy=-30 tart=0 yart=-100
+behinde_a.step3 = x=3810 y=-1131 z=4305 xz=-45 zy=-30 tart=0 yart=-100
+behinde_a.step4 = x=3924 y=-1135 z=4467 xz=-45 zy=-30 tart=0 yart=-100
+behinde_a.step5 = x=4000 y=-1136 z=4521 xz=-45 zy=-30 tart=0 yart=-100
+behinde_a.step6 = x=4050 y=-1136 z=4539 xz=-45 zy=-30 tart=0 yart=-100
+behinde_a.step7 = x=4084 y=-1136 z=4545 xz=-45 zy=-30 tart=0 yart=-100
+behinde_a.step8 = x=4106 y=-1136 z=4547 xz=-45 zy=-30 tart=0 yart=-100
+behinde_b.step1 = x=3431 y=-1338 z=2765 xz=10 zy=20 tart=60 yart=-50
+behinde_b.step2 = x=3715 y=-1474 z=4351 xz=-30 zy=20 tart=100 yart=-13
+behinde_b.step3 = x=3901 y=-1537 z=4877 xz=-56 zy=20 tart=126 yart=15
+behinde_b.step4 = x=4023 y=-1571 z=5051 xz=-74 zy=20 tart=144 yart=36
+behinde_b.step5 = x=4103 y=-1593 z=5107 xz=-86 zy=20 tart=156 yart=52
+behinde_b.step6 = x=4154 y=-1607 z=5125 xz=-94 zy=20 tart=164 yart=64
+behinde_b.step7 = x=4187 y=-1617 z=5131 xz=-99 zy=20 tart=169 yart=73
+behinde_b.step8 = x=4209 y=-1625 z=5132 xz=-102 zy=20 tart=172 yart=79
+left.step1 = x=3782 y=-1233 z=2916 xz=-135 zy=0 tart=0 yart=-100
+left.step2 = x=4043 y=-1311 z=4554 xz=-135 zy=0 tart=0 yart=-100
+left.step3 = x=4130 y=-1337 z=5100 xz=-135 zy=0 tart=0 yart=-100
+left.step4 = x=4159 y=-1345 z=5282 xz=-135 zy=0 tart=0 yart=-100
+left.step5 = x=4169 y=-1348 z=5343 xz=-135 zy=0 tart=0 yart=-100
+left.step6 = x=4172 y=-1349 z=5363 xz=-135 zy=0 tart=0 yart=-100
+left.step7 = x=4173 y=-1349 z=5370 xz=-135 zy=0 tart=0 yart=-100
+left.step8 = x=4173 y=-1349 z=5372 xz=-135 zy=0 tart=0 yart=-100
+right.step1 = x=3108 y=-1233 z=2350 xz=45 zy=0 tart=0 yart=-100
+right.step2 = x=3180 y=-1311 z=3800 xz=45 zy=0 tart=0 yart=-100
+right.step3 = x=3228 y=-1337 z=4284 xz=45 zy=0 tart=0 yart=-100
+right.step4 = x=3260 y=-1345 z=4445 xz=45 zy=0 tart=0 yart=-100
+right.step5 = x=3282 y=-1348 z=4499 xz=45 zy=0 tart=0 yart=-100
+right.step6 = x=3296 y=-1349 z=4517 xz=45 zy=0 tart=0 yart=-100
+right.step7 = x=3306 y=-1349 z=4523 xz=45 zy=0 tart=0 yart=-100
+right.step8 = x=3312 y=-1349 z=4525 xz=45 zy=0 tart=0 yart=-100
+watch.step1 = x=2552 y=-2959 z=7013 xz=-210 zy=6 tart=0 yart=-100
+watch.step2 = x=2552 y=-2959 z=7013 xz=-210 zy=11 tart=0 yart=-100
+watch.step3 = x=2552 y=-2959 z=7013 xz=-210 zy=15 tart=0 yart=-100
+watch.step4 = x=2552 y=-2959 z=7013 xz=-210 zy=18 tart=0 yart=-100
+watch.step5 = x=2552 y=-2959 z=7013 xz=-210 zy=21 tart=0 yart=-100
+watch.step6 = x=2552 y=-2959 z=7013 xz=-210 zy=23 tart=0 yart=-100
+watch.step7 = x=2552 y=-2959 z=7013 xz=-210 zy=25 tart=0 yart=-100
+watch.step8 = x=2552 y=-2959 z=7013 xz=-210 zy=26 tart=0 yart=-100
+infront_neg.step1 = x=-234 y=909 z=-6398 xz=-225 zy=30 tart=0 yart=-100
+infront_neg.step2 = x=-2390 y=1545 z=-7864 xz=-225 zy=30 tart=0 yart=-100
+infront_neg.step3 = x=-3827 y=1757 z=-8352 xz=-225 zy=30 tart=0 yart=-100
+infront_neg.step4 = x=-4785 y=1828 z=-8515 xz=-225 zy=30 tart=0 yart=-100
+infront_neg.step5 = x=-5424 y=1852 z=-8569 xz=-225 zy=30 tart=0 yart=-100
+infront_neg.step6 = x=-5850 y=1860 z=-8587 xz=-225 zy=30 tart=0 yart=-100
+infront_neg.step7 = x=-6134 y=1862 z=-8593 xz=-225 zy=30 tart=0 yart=-100
+infront_neg.step8 = x=-6323 y=1863 z=-8595 xz=-225 zy=30 tart=0 yart=-100
+behinde_neg.step1 = x=51 y=1375 z=-6968 xz=-45 zy=-30 tart=0 yart=-100
+behinde_neg.step2 = x=-1915 y=2167 z=-8624 xz=-45 zy=-30 tart=0 yart=-100
+behinde_neg.step3 = x=-3226 y=2431 z=-9176 xz=-45 zy=-30 tart=0 yart=-100
+behinde_neg.step4 = x=-4100 y=2519 z=-9360 xz=-45 zy=-30 tart=0 yart=-100
+behinde_neg.step5 = x=-4682 y=2548 z=-9421 xz=-45 zy=-30 tart=0 yart=-100
+behinde_neg.step6 = x=-5070 y=2558 z=-9441 xz=-45 zy=-30 tart=0 yart=-100
+behinde_neg.step7 = x=-5329 y=2561 z=-9448 xz=-45 zy=-30 tart=0 yart=-100
+behinde_neg.step8 = x=-5502 y=2562 z=-9450 xz=-45 zy=-30 tart=0 yart=-100
+left_neg.step1 = x=-2884 y=1233 z=-6417 xz=-135 zy=0 tart=0 yart=-100
+left_neg.step2 = x=-4845 y=1977 z=-7889 xz=-135 zy=0 tart=0 yart=-100
+left_neg.step3 = x=-5499 y=2225 z=-8380 xz=-135 zy=0 tart=0 yart=-100
+left_neg.step4 = x=-5717 y=2308 z=-8544 xz=-135 zy=0 tart=0 yart=-100
+left_neg.step5 = x=-5789 y=2336 z=-8598 xz=-135 zy=0 tart=0 yart=-100
+left_neg.step6 = x=-5813 y=2345 z=-8616 xz=-135 zy=0 tart=0 yart=-100
+left_neg.step7 = x=-5821 y=2348 z=-8622 xz=-135 zy=0 tart=0 yart=-100
+left_neg.step8 = x=-5824 y=2349 z=-8624 xz=-135 zy=0 tart=0 yart=-100
+right_neg.step1 = x=-224 y=1233 z=-6982 xz=45 zy=0 tart=0 yart=-100
+right_neg.step2 = x=-2374 y=1977 z=-8643 xz=45 zy=0 tart=0 yart=-100
+right_neg.step3 = x=-3807 y=2225 z=-9197 xz=45 zy=0 tart=0 yart=-100
+right_neg.step4 = x=-4762 y=2308 z=-9381 xz=45 zy=0 tart=0 yart=-100
+right_neg.step5 = x=-5399 y=2336 z=-9443 xz=45 zy=0 tart=0 yart=-100
+right_neg.step6 = x=-5824 y=2345 z=-9463 xz=45 zy=0 tart=0 yart=-100
+right_neg.step7 = x=-6107 y=2348 z=-9470 xz=45 zy=0 tart=0 yart=-100
+right_neg.step8 = x=-6296 y=2349 z=-9472 xz=45 zy=0 tart=0 yart=-100
+watch_neg.step1 = x=-7448 y=741 z=-6987 xz=-210 zy=6 tart=0 yart=-100
+watch_neg.step2 = x=-7448 y=741 z=-6987 xz=-210 zy=11 tart=0 yart=-100
+watch_neg.step3 = x=-7448 y=741 z=-6987 xz=-210 zy=15 tart=0 yart=-100
+watch_neg.step4 = x=-7448 y=741 z=-6987 xz=-210 zy=18 tart=0 yart=-100
+watch_neg.step5 = x=-7448 y=741 z=-6987 xz=-210 zy=21 tart=0 yart=-100
+watch_neg.step6 = x=-7448 y=741 z=-6987 xz=-210 zy=23 tart=0 yart=-100
+watch_neg.step7 = x=-7448 y=741 z=-6987 xz=-210 zy=25 tart=0 yart=-100
+watch_neg.step8 = x=-7448 y=741 z=-6987 xz=-210 zy=26 tart=0 yart=-100
+infront_ab.step1 = x=1433 y=3242 z=-4731 xz=-225 zy=30 tart=0 yart=-100
+infront_ab.step2 = x=-2279 y=3323 z=-9308 xz=-225 zy=30 tart=0 yart=-100
+infront_ab.step3 = x=-4753 y=3350 z=-10834 xz=-225 zy=30 tart=0 yart=-100
+infront_ab.step4 = x=-6403 y=3359 z=-11342 xz=-225 zy=30 tart=0 yart=-100
+infront_ab.step5 = x=-7503 y=3362 z=-11512 xz=-225 zy=30 tart=0 yart=-100
+infront_ab.step6 = x=-8236 y=3363 z=-11568 xz=-225 zy=30 tart=0 yart=-100
+infront_ab.step7 = x=-8725 y=3363 z=-11587 xz=-225 zy=30 tart=0 yart=-100
+infront_ab.step8 = x=-9051 y=3363 z=-11593 xz=-225 zy=30 tart=0 yart=-100
+behinde_ab.step1 = x=1718 y=3708 z=-5301 xz=-45 zy=-30 tart=0 yart=-100
+behinde_ab.step2 = x=-1804 y=3944 z=-10068 xz=-45 zy=-30 tart=0 yart=-100
+behinde_ab.step3 = x=-4152 y=4023 z=-11657 xz=-45 zy=-30 tart=0 yart=-100
+behinde_ab.step4 = x=-5717 y=4049 z=-12187 xz=-45 zy=-30 tart=0 yart=-100
+behinde_ab.step5 = x=-6760 y=4058 z=-12363 xz=-45 zy=-30 tart=0 yart=-100
+behinde_ab.step6 = x=-7456 y=4061 z=-12422 xz=-45 zy=-30 tart=0 yart=-100
+behinde_ab.step7 = x=-7920 y=4062 z=-12442 xz=-45 zy=-30 tart=0 yart=-100
+behinde_ab.step8 = x=-8229 y=4062 z=-12448 xz=-45 zy=-30 tart=0 yart=-100
+left_ab.step1 = x=-3550 y=3566 z=-4750 xz=-135 zy=0 tart=0 yart=-100
+left_ab.step2 = x=-7067 y=3755 z=-9334 xz=-135 zy=0 tart=0 yart=-100
+left_ab.step3 = x=-8239 y=3818 z=-10862 xz=-135 zy=0 tart=0 yart=-100
+left_ab.step4 = x=-8630 y=3839 z=-11371 xz=-135 zy=0 tart=0 yart=-100
+left_ab.step5 = x=-8760 y=3846 z=-11541 xz=-135 zy=0 tart=0 yart=-100
+left_ab.step6 = x=-8804 y=3848 z=-11597 xz=-135 zy=0 tart=0 yart=-100
+left_ab.step7 = x=-8818 y=3849 z=-11616 xz=-135 zy=0 tart=0 yart=-100
+left_ab.step8 = x=-8823 y=3849 z=-11622 xz=-135 zy=0 tart=0 yart=-100
+right_ab.step1 = x=1442 y=3566 z=-5316 xz=45 zy=0 tart=0 yart=-100
+right_ab.step2 = x=-2263 y=3755 z=-10088 xz=45 zy=0 tart=0 yart=-100
+right_ab.step3 = x=-4733 y=3818 z=-11678 xz=45 zy=0 tart=0 yart=-100
+right_ab.step4 = x=-6380 y=3839 z=-12208 xz=45 zy=0 tart=0 yart=-100
+right_ab.step5 = x=-7478 y=3846 z=-12385 xz=45 zy=0 tart=0 yart=-100
+right_ab.step6 = x=-8210 y=3848 z=-12444 xz=45 zy=0 tart=0 yart=-100
+right_ab.step7 = x=-8698 y=3849 z=-12464 xz=45 zy=0 tart=0 yart=-100
+right_ab.step8 = x=-9023 y=3849 z=-12470 xz=45 zy=0 tart=0 yart=-100
+infront_cv.step1 = x=4917 y=1300 z=6166 xz=-180 zy=0 tart=0 yart=-100
+infront_cv.step2 = x=4195 y=866 z=5222 xz=-180 zy=0 tart=0 yart=-100
+infront_cv.step3 = x=3714 y=722 z=4907 xz=-180 zy=0 tart=0 yart=-100
+infront_cv.step4 = x=3393 y=674 z=4802 xz=-180 zy=0 tart=0 yart=-100
+infront_cv.step5 = x=3179 y=658 z=4767 xz=-180 zy=0 tart=0 yart=-100
+infront_cv.step6 = x=3036 y=652 z=4755 xz=-180 zy=0 tart=0 yart=-100
+infront_cv.step7 = x=2941 y=650 z=4751 xz=-180 zy=0 tart=0 yart=-100
+infront_cv.step8 = x=2878 y=650 z=4750 xz=-180 zy=0 tart=0 yart=-100
+behinde_cv.step1 = x=4917 y=1300 z=5233 xz=0 zy=0 tart=0 yart=-100
+behinde_cv.step2 = x=4195 y=866 z=3977 xz=0 zy=0 tart=0 yart=-100
+behinde_cv.step3 = x=3714 y=722 z=3559 xz=0 zy=0 tart=0 yart=-100
+behinde_cv.step4 = x=3393 y=674 z=3419 xz=0 zy=0 tart=0 yart=-100
+behinde_cv.step5 = x=3179 y=658 z=3373 xz=0 zy=0 tart=0 yart=-100
+behinde_cv.step6 = x=3036 y=652 z=3357 xz=0 zy=0 tart=0 yart=-100
+behinde_cv.step7 = x=2941 y=650 z=3352 xz=0 zy=0 tart=0 yart=-100
+behinde_cv.step8 = x=2878 y=650 z=3350 xz=0 zy=0 tart=0 yart=-100
+left_cv.step1 = x=4233 y=1366 z=5633 xz=-90 zy=0 tart=0 yart=-100
+left_cv.step2 = x=3644 y=955 z=4511 xz=-90 zy=0 tart=0 yart=-100
+left_cv.step3 = x=3448 y=818 z=4137 xz=-90 zy=0 tart=0 yart=-100
+left_cv.step4 = x=3382 y=772 z=4012 xz=-90 zy=0 tart=0 yart=-100
+left_cv.step5 = x=3360 y=757 z=3970 xz=-90 zy=0 tart=0 yart=-100
+left_cv.step6 = x=3353 y=752 z=3956 xz=-90 zy=0 tart=0 yart=-100
+left_cv.step7 = x=3351 y=750 z=3952 xz=-90 zy=0 tart=0 yart=-100
+left_cv.step8 = x=3350 y=750 z=3950 xz=-90 zy=0 tart=0 yart=-100
+right_cv.step1 = x=4717 y=1366 z=5633 xz=90 zy=0 tart=0 yart=-100
+right_cv.step2 = x=3862 y=955 z=4511 xz=90 zy=0 tart=0 yart=-100
+right_cv.step3 = x=3292 y=818 z=4137 xz=90 zy=0 tart=0 yart=-100
+right_cv.step4 = x=2912 y=772 z=4012 xz=90 zy=0 tart=0 yart=-100
+right_cv.step5 = x=2658 y=757 z=3970 xz=90 zy=0 tart=0 yart=-100
+right_cv.step6 = x=2489 y=752 z=3956 xz=90 zy=0 tart=0 yart=-100
+right_cv.step7 = x=2376 y=750 z=3952 xz=90 zy=0 tart=0 yart=-100
+right_cv.step8 = x=2301 y=750 z=3950 xz=90 zy=0 tart=0 yart=-100
+around3000.step1 = x=500 y=-1700 z=5000 xz=88 zy=0 tart=0 yart=-100 adv=-502 vxz=2 vert=true
+around3000.step2 = x=501 y=-1702 z=4878 xz=86 zy=0 tart=0 yart=-100 adv=-500 vxz=4 vert=true
+around3000.step3 = x=509 y=-1700 z=4756 xz=84 zy=0 tart=0 yart=-100 adv=-498 vxz=6 vert=true
+around3000.step4 = x=522 y=-1698 z=4635 xz=82 zy=0 tart=0 yart=-100 adv=-496 vxz=8 vert=true
+around3000.step5 = x=539 y=-1696 z=4514 xz=80 zy=0 tart=0 yart=-100 adv=-494 vxz=10 vert=true
+around3000.step6 = x=560 y=-1694 z=4394 xz=78 zy=0 tart=0 yart=-100 adv=-492 vxz=12 vert=true
+around3000.step7 = x=585 y=-1692 z=4274 xz=76 zy=0 tart=0 yart=-100 adv=-490 vxz=14 vert=true
+around3000.step8 = x=614 y=-1690 z=4156 xz=74 zy=0 tart=0 yart=-100 adv=-488 vxz=16 vert=true
+around6000.step1 = x=-3000 y=-1700 z=5000 xz=88 zy=0 tart=0 yart=-100 adv=-510 vxz=2 vert=false
+around6000.step2 = x=-3015 y=-1710 z=4756 xz=86 zy=0 tart=0 yart=-100 adv=-520 vxz=4 vert=false
+around6000.step3 = x=-3022 y=-1720 z=4509 xz=84 zy=0 tart=0 yart=-100 adv=-530 vxz=6 vert=false
+around6000.step4 = x=-3021 y=-1730 z=4263 xz=82 zy=0 tart=0 yart=-100 adv=-540 vxz=8 vert=false
+around6000.step5 = x=-3011 y=-1740 z=4015 xz=80 zy=0 tart=0 yart=-100 adv=-550 vxz=10 vert=false
+around6000.step6 = x=-2992 y=-1750 z=3768 xz=78 zy=0 tart=0 yart=-100 adv=-560 vxz=12 vert=false
+around6000.step7 = x=-2964 y=-1760 z=3520 xz=76 zy=0 tart=0 yart=-100 adv=-570 vxz=14 vert=false
+around6000.step8 = x=-2927 y=-1770 z=3273 xz=74 zy=0 tart=0 yart=-100 adv=-580 vxz=16 vert=false
+d(zy=0,y=0,jumping=0) = zy=0 y=0 ground=250 jumping=0
+d(zy=120,y=-800,jumping=0) = zy=90 y=-800 ground=1050 jumping=0
+d(zy=-120,y=500,jumping=3) = zy=-90 y=0 ground=250 jumping=2
+d(zy=45,y=-1000,jumping=1) = zy=45 y=-1000 ground=1250 jumping=0
+PROBE OK

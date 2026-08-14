@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>graphics.js smoke</title></head>
+<body style="margin:0;background:#222">
+<!--
+  A browser smoke test for port/graphics.js: the Canvas2D Graphics shim, the
+  offscreen-image plumbing (createImage / grabPixels / imageFromPixels) and the
+  even-odd fill rule. node cannot run these — there is no canvas — so this page
+  is the harness, driven headlessly:
+
+    chromium --headless=new --no-sandbox --screenshot=/tmp/ra1port/smoke.png \
+      --window-size=520,760 --virtual-time-budget=8000 \
+      http://localhost:8123/port/tools/graphics-smoke.html
+
+  It prints PASS/FAIL lines to the console (read them with
+  --enable-logging=stderr --vmodule=console=1) and draws the same shapes on
+  screen so a human can look at them.
+-->
+<canvas id="c" width="500" height="360"></canvas>
+<pre id="out" style="color:#8f8;font:12px monospace;padding:8px"></pre>
+
+<script type="module">
+import { Graphics2D, createImage, imageFromPixels, grabPixels } from '../graphics.js';
+import { colorOf, colorRed, colorGreen, colorBlue, intArray } from '../java.js';
+
+const out = [];
+function check(name, ok, detail = '') {
+  out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`);
+  console.log(out[out.length - 1]);
+}
+
+const canvas = document.getElementById('c');
+const g = new Graphics2D(canvas.getContext('2d', { willReadFrequently: true }));
+
+// 1. fillRect and the packed-colour contract.
+g.setColor(colorOf(180, 120, 60));
+g.fillRect(0, 0, 500, 360);
+const pix = intArray(500 * 360);
+grabPixels(canvas, pix);
+const p = pix[0];
+check('fillRect + setColor round-trip through grabPixels',
+  colorRed(p) === 180 && colorGreen(p) === 120 && colorBlue(p) === 60,
+  `got ${colorRed(p)},${colorGreen(p)},${colorBlue(p)}`);
+
+// 2. Even-odd fill: a pentagram. Its inner pentagon is crossed twice, so it
+//    stays UNFILLED under even-odd (what AWT does) and is FILLED under the
+//    nonzero rule Canvas defaults to. A bowtie will not do — its crossing is a
+//    single point, and the pixel there is antialiased under either rule.
+g.setColor(colorOf(0, 0, 0));
+g.fillRect(0, 0, 500, 360);
+g.setColor(colorOf(255, 255, 255));
+{
+  const cx = 250, cy = 180, r = 150;
+  const sxs = [], sys = [];
+  for (let k = 0; k < 5; k++) {
+    const a = -Math.PI / 2 + (k * 4 * Math.PI) / 5;   // every second vertex
+    sxs.push(Math.round(cx + r * Math.cos(a)));
+    sys.push(Math.round(cy + r * Math.sin(a)));
+  }
+  g.fillPolygon(sxs, sys, 5);
+}
+grabPixels(canvas, pix);
+const centre = pix[180 * 500 + 250];
+check('fillPolygon uses the even-odd rule', colorRed(centre) === 0,
+  `centre pixel red=${colorRed(centre)} (255 means the nonzero rule)`);
+
+// 3. createImage gives a drawable offscreen image with its own Graphics.
+const off = createImage(500, 360);
+const og = off.getGraphics();
+og.setColor(colorOf(10, 200, 30));
+og.fillRect(0, 0, 500, 360);
+g.drawImage(off, 0, 0);
+grabPixels(canvas, pix);
+check('createImage + getGraphics + drawImage',
+  colorGreen(pix[10]) === 200, `green=${colorGreen(pix[10])}`);
+
+// 4. MemoryImageSource: build an image from a pixel array and blit it back.
+const src = intArray(500 * 360);
+for (let i = 0; i < src.length; i++) src[i] = colorOf(1, 2, 3);
+g.drawImage(imageFromPixels(500, 360, src), 0, 0);
+grabPixels(canvas, pix);
+check('imageFromPixels round-trip',
+  colorRed(pix[7]) === 1 && colorGreen(pix[7]) === 2 && colorBlue(pix[7]) === 3);
+
+// 5. Text metrics exist and are sane for the game's font.
+g.setFont('SansSerif', 1, 11);
+const fm = g.getFontMetrics();
+check('FontMetrics', fm.getHeight() > 0 && fm.stringWidth('Loading') > 0,
+  `height=${fm.getHeight()} width('Loading')=${fm.stringWidth('Loading')}`);
+
+// Leave something on screen for the screenshot.
+g.setColor(colorOf(0, 0, 0));
+g.fillRect(0, 0, 500, 360);
+g.setColor(colorOf(222, 184, 34));
+g.fillPolygon([250, 480, 20], [20, 340, 340], 3);
+g.setColor(colorOf(151, 166, 183));
+g.drawString('RADICAL ACES — graphics.js smoke', 120, 200);
+
+document.getElementById('out').textContent = out.join('\n');
+console.log(out.some((l) => l.startsWith('FAIL')) ? 'SMOKE FAILED' : 'SMOKE OK');
+</script>
+</body>
+</html>

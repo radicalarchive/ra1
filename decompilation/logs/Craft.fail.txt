@@ -1,0 +1,135 @@
+✔ every model file in the distribution parses identically to Java (13.697449ms)
+✔ getvalue throws exactly where Java throws (0.214164ms)
+✔ getpy wraps at int32 exactly as Java does (0.155283ms)
+✔ xs / ys clamp j and wrap, from the probe (0.157397ms)
+✔ reset clears rotation and hit state (0.140354ms)
+✔ Craft constructor and default fields match Java probe (1.531254ms)
+✔ getpy, getcpy, getepy wrap at int32 exactly as Java does (from probe) (1.297233ms)
+✔ nearst and myway match Java probe (0.963254ms)
+✔ reset updates craft parameters correctly (from probe) (0.315024ms)
+✔ lasercolid detects laser hits and damages ContO (from probe) (0.852696ms)
+✔ dl and dosmokes state transitions (from probe) (0.457331ms)
+✖ preform Scenario A: Climbing in air (u.up = true, Case A compound assignments) (2.92541ms)
+✔ preform Scenario B: Diving with down key and high speed (Case B lift sub) (1.4337ms)
+✔ preform Scenario C: Banking left and right (Probe lines 553-612) (1.357998ms)
+✔ preform Scenario D: Boundary clamping (Probe lines 613-615) (1.515815ms)
+✖ preform Scenario E: Ground contact / crash (Probe lines 616-658) (1.650188ms)
+✔ preform Scenario F: Laser firing (Probe lines 659-664) (1.100983ms)
+✔ preform Scenario G: Laser homing update (Probe lines 665-670) (1.248562ms)
+✔ constructor defaults match the real class (1.431326ms)
+✔ ys clamps j and wraps at int32 (0.204996ms)
+✔ infront (infront_a) tracks Java for eight steps (1.227051ms)
+✔ infront (infront_b) tracks Java for eight steps (0.374496ms)
+✔ behinde (behinde_a) tracks Java for eight steps (0.321516ms)
+✔ behinde (behinde_b) tracks Java for eight steps (0.272063ms)
+✔ left (left) tracks Java for eight steps (0.295046ms)
+✔ right (right) tracks Java for eight steps (0.275308ms)
+✔ watch (watch) tracks Java for eight steps (0.799095ms)
+✔ infront (infront_neg) tracks Java for eight steps (0.362332ms)
+✔ behinde (behinde_neg) tracks Java for eight steps (0.247135ms)
+✔ left (left_neg) tracks Java for eight steps (0.219383ms)
+✔ right (right_neg) tracks Java for eight steps (0.165963ms)
+✔ watch (watch_neg) tracks Java for eight steps (0.404993ms)
+✔ infront (infront_ab) tracks Java for eight steps (0.189286ms)
+✔ behinde (behinde_ab) tracks Java for eight steps (0.147959ms)
+✔ left (left_ab) tracks Java for eight steps (0.173416ms)
+✔ right (right_ab) tracks Java for eight steps (0.171964ms)
+✔ infront (infront_cv) tracks Java for eight steps (0.137228ms)
+✔ behinde (behinde_cv) tracks Java for eight steps (0.174909ms)
+✔ left (left_cv) tracks Java for eight steps (0.19631ms)
+✔ right (right_cv) tracks Java for eight steps (0.179108ms)
+✔ around(3000) tracks Java for eight steps (0.337556ms)
+✔ around(6000) tracks Java for eight steps (0.248478ms)
+✔ d() clamps zy and y, recomputes ground, decrements jumping (0.375928ms)
+✔ constructor: n, ox, oy, oz, c fields (from probe) (1.271144ms)
+✔ constructor: deltaf_after_ctor = 3.5538489E10 (from probe) (0.280558ms)
+✔ constructor: projf_after_ctor = 1.0 (from probe) (0.183275ms)
+✔ constructor: sr=255, sg=220, exp=0 (from probe) (0.636558ms)
+✔ loadprojf: projf = 3.5317494E10 (from probe) (0.236756ms)
+✔ xs(3000, 2000) = 800 (from probe) (0.176362ms)
+✔ xs(-500, 800) = -125 (from probe) (0.133031ms)
+✔ xs(200, 5) = -1750 — j<10 clamped to 10 (from probe) (0.134363ms)
+✔ xs(200, -100) = -1750 — negative j clamped to 10 (from probe) (0.28186ms)
+✔ xs(0, 0) = -9750 — j==0 clamped to 10 (from probe) (0.296779ms)
+✔ ys(3000, 2000) = 720 (from probe) (0.200708ms)
+✔ ys(-500, 800) = -175 (from probe) (0.108174ms)
+✔ ys(200, 5) = 2150 — j<10 clamped to 10 (from probe) (0.11138ms)
+✔ ys(200, -100) = 2150 — negative j clamped to 10 (from probe) (0.116209ms)
+✔ ys(0, 0) = -5850 — j==0 clamped to 10 (from probe) (0.100349ms)
+✔ spy(250, 0) = 0 — on-centre (from probe) (0.114175ms)
+✔ spy(0, 0) = 250 (from probe) (0.09562ms)
+✔ spy(1000, 1000) = 1250 (from probe) (0.093436ms)
+✔ spy(50000, 60000) = 42191 — int32 overflow, wrapped (from probe) (0.126278ms)
+✔ spy(-30000, -40000) = 0 — wrapped sum is negative, sqrt(neg)=NaN, trunc(NaN)=0 (from probe) (0.093707ms)
+✔ rot k=45: arrays rotated in place (from probe) (0.160001ms)
+✔ rot k=0 is a no-op: arrays unchanged (from probe) (0.094298ms)
+✔ d() exp=0 flag=false: av=4382, projf=2.89187738E10, exp=0 (from probe) (0.540808ms)
+✔ d() exp=0 flag=true: av=4233, projf=28754.979 (from probe) (0.136898ms)
+✔ s() exp=0 all oy>ground: exp unchanged (from probe: exp_after_s_allaboveground=0) (0.220866ms)
+✔ s() exp=0 all oy<ground: shadow drawn, exp unchanged (from probe: exp_after_s_belowground=0) (0.148831ms)
+✔ tsin and tcos arrays have length 360 (1.215108ms)
+✔ tsin table spot-checks — first five entries (from probe) (0.117261ms)
+✔ tsin table spot-checks — boundary angles (from probe) (0.146817ms)
+✔ tcos table spot-checks — first five entries (from probe) (0.113363ms)
+✔ tcos table spot-checks — boundary angles (from probe) (0.12214ms)
+✔ tsin/tcos mid-table entries at 45 and 135 (from probe) (0.115217ms)
+✔ getsin in-range inputs (from probe) (0.141046ms)
+✔ getcos in-range inputs (from probe) (0.128281ms)
+✔ getsin wraps angles >= 360 (from probe) (0.264879ms)
+✔ getcos wraps angles >= 360 (from probe) (0.27565ms)
+✔ getsin wraps negative angles (from probe) (0.162306ms)
+✔ getcos wraps negative angles (from probe) (0.096662ms)
+✔ readLines splits a real level file the way DataInputStream.readLine does (3.336214ms)
+✔ readLines is Latin-1, not UTF-8 (0.183385ms)
+✔ readZip inflates models.zrad, entries in stored order (39.446956ms)
+✔ readZip entry names match the objects/ models (13.967407ms)
+ℹ tests 85
+ℹ suites 0
+ℹ pass 83
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 112.722156
+
+✖ failing tests:
+
+test at Craft.test.js:316:1
+✖ preform Scenario A: Climbing in air (u.up = true, Case A compound assignments) (2.92541ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///home/evan/resources/ra1/port/Craft.test.js:365:10)
+      at Test.runInAsyncScope (node:async_hooks:211:14)
+      at Test.run (node:internal/test_runner/test:980:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:678:18)
+      at Test.postRun (node:internal/test_runner/test:1091:19)
+      at Test.run (node:internal/test_runner/test:1019:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:678:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual'
+  }
+
+test at Craft.test.js:676:1
+✖ preform Scenario E: Ground contact / crash (Probe lines 616-658) (1.650188ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (file:///home/evan/resources/ra1/port/Craft.test.js:755:10)
+      at Test.runInAsyncScope (node:async_hooks:211:14)
+      at Test.run (node:internal/test_runner/test:980:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:678:18)
+      at Test.postRun (node:internal/test_runner/test:1091:19)
+      at Test.run (node:internal/test_runner/test:1019:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:678:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual'
+  }

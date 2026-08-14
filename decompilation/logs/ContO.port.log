@@ -1,0 +1,45 @@
+=== agy_ra1 ===================================================
+phase   : port
+class   : ContO
+writes  : /home/evan/resources/ra1/port/ContO.js and /home/evan/resources/ra1/port/tools/ContOProbe.java
+model   : claude-sonnet-4-6   (effort high, timeout 45m)
+===============================================================
+I'll read all required files before writing a line of code.
+Now let me read the supporting files:
+Now let me look at the NFM reference implementations:
+Good, I have enough context from the NFM reference. Now let me carefully analyze the RA1 ContO.java for all compound-assignment sites and numeric semantics before writing any code.
+
+Let me grep for `+= (int)(` and `-= (int)(` in ContO.java:
+No compound-assignment sites with `(int)(` in ContO.java. Now let me look at the Plane.java to understand the `Plane` constructor signature since ContO calls it:
+Now I have everything I need. Let me carefully analyze the key numeric operations in ContO.java before writing the JS:
+
+**Key observations from ContO.java:**
+
+1. **`xs()` and `ys()`** — Java line 333/42:
+   - `(j - this.m.focus_point) * (this.m.cx - i) / j + i` 
+   - All `int` types. `j` can be large (50000), `cx` can be ~250, so `(j - focus_point) * (cx - i)` can easily exceed int32. Must use `Math.imul` + `idiv` + `i32`.
+
+2. **`d()` method** — lines 218-261:
+   - `k`, `l`, `i2`, `k2` computed using `getcos/getsin` (return float). Every multiply is float, need `fr()`. Cast to int with `trunc()`.
+   - Line 261: `this.dist = (int)Math.sqrt(...) * this.grounded` — `Math.sqrt` returns double, then `(int)` cast = `trunc()`, then multiplied by `grounded` (int). Result is int.
+   - The inner expressions `(this.m.x + this.m.cx - this.x) * (...)` are all int*int squarings. These CAN overflow.
+
+3. **`getpy()`** — line 295:
+   - `(i - this.x) / 10 * ((i - this.x) / 10) + ...` All int operations. Division first (idiv), then multiply (imul can overflow!), then addition (i32 needed).
+
+4. **`tryexp()`** — line 276, 280, 287:
+   - Various int multiplications that can overflow.
+
+5. **Constructor `div` line**: `f = this.getvalue("div", s2, 0) / 10.0f` — divides by float literal, result is float. `f` is declared `float`.
+
+6. **Line 105-107**: `(int)(this.getvalue("p", s2, 0) * f)` — `getvalue` returns `int`, `f` is `float`, so `int * float = float`, then `(int)` cast = `trunc()`.
+
+7. **`Integer.valueOf(s2)`** on line 326 — returns Integer in Java, auto-unboxes to int. In JS, use `parseInt(s2, 10)`. BUT: `Integer.valueOf("")` throws NumberFormatException which matches `parseInt("", 10) = NaN` NOT a throw. The spec says §5a: `Integer.parseInt(s)` throws. But Java's `Integer.valueOf(s2)` calls `Integer.parseInt` internally and also throws. The question is whether to match that throw. Spec says "Match the throw". However, `parseInt(s2, 10)` returns NaN on bad input. Looking at the usage in `getvalue`: the game relies on the throw. So I need to replicate that.
+
+   Looking at the getvalue code: it reads chars from a string until it gets the i-th comma-delimited value, then calls `Integer.valueOf(s2)`. If the parsing fails (bad format), Java throws. I should match that by using `parseInt(s2, 10)` and if the result is NaN, throw.
+
+   Actually, re-reading §5a: "Match Java's behaviour, including the throw. Do NOT add a bounds check the Java does not have." The getvalue code doesn't have a manual bounds check — it relies on `charAt` throwing when past the end. In JS, `s[i]` returns `undefined` which when concatenated gives `"undefined"` string, then `parseInt("undefined", 10)` = NaN (not a throw). But `Integer.valueOf("undefined")` throws NumberFormatException. The game relies on this throw "in at least one place" per the spec. So I need to propagate the throw behavior.
+
+   The cleanest approach: after `parseInt`, check for NaN and throw.
+
+Now let me write the transpiled ContO.js:

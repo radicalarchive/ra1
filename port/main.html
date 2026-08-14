@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Radical Aces</title>
+<style>
+  /* The game is a fixed 500x360 offscreen image blitted by F51.paint(). The
+     page scales that up with nearest-neighbour so the chunky 2001 look
+     survives; the canvas backing store stays 500x360 so every coordinate in
+     the transpiled code means exactly what it meant in Java. */
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #000;
+    color: #aeb9c6;
+    font: 13px/1.4 sans-serif;
+    overflow: hidden;
+  }
+  #wrap {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    width: min(100vw, calc(100vh * 500 / 360));
+    height: auto;
+    aspect-ratio: 500 / 360;
+    image-rendering: pixelated;
+    background: #000;
+    /* The game takes every arrow key and TAB; keep the browser out of it. */
+    touch-action: none;
+    outline: none;
+  }
+  #gesture {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, .82);
+    cursor: pointer;
+    z-index: 2;
+  }
+  #gesture p { text-align: center; letter-spacing: .04em; }
+  #error {
+    position: fixed;
+    inset: auto 0 0 0;
+    padding: 8px 12px;
+    background: #400;
+    color: #fdd;
+    font-family: monospace;
+    white-space: pre-wrap;
+    display: none;
+    z-index: 3;
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="screen" width="500" height="360" tabindex="0"></canvas>
+</div>
+
+<!-- Browsers refuse to start audio without a user gesture, and this game
+     opens on a music track, so the first click both unlocks the AudioContext
+     and gives the canvas keyboard focus. -->
+<div id="gesture"><p>RADICAL ACES<br><br>click to play</p></div>
+
+<div id="error"></div>
+
+<script type="module">
+  import { boot } from './main.js';
+
+  const canvas = document.getElementById('screen');
+  const gesture = document.getElementById('gesture');
+  const errbox = document.getElementById('error');
+
+  function fail(e) {
+    errbox.style.display = 'block';
+    errbox.textContent = String(e && e.stack ? e.stack : e);
+    console.error(e);
+  }
+  window.addEventListener('error', (e) => fail(e.error || e.message));
+  window.addEventListener('unhandledrejection', (e) => fail(e.reason));
+
+  gesture.addEventListener('click', async () => {
+    gesture.remove();
+    canvas.focus();
+    try {
+      await boot(canvas);
+    } catch (e) {
+      fail(e);
+    }
+  }, { once: true });
+</script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+=== agy_ra1 ===================================================
+phase   : port
+class   : Craft
+writes  : /home/evan/resources/ra1/port/Craft.js and /home/evan/resources/ra1/port/tools/CraftProbe.java
+model   : gemini-3.7-flash-medium   (effort high, timeout 45m)
+===============================================================
+### Summary of Transpiled Files
+
+1. [`Craft.js`](file:///home/evan/resources/ra1/port/Craft.js) — Line-by-line ES module transpilation of `Craft.java`.
+2. [`CraftProbe.java`](file:///home/evan/resources/ra1/port/tools/CraftProbe.java) — Java reflection probe driving the real `Craft` class from `ra1.jar`.
+
+---
+
+### Compound-Assignment Audit (§2)
+
+Searched for all occurrences of `+= (int)(`, `-= (int)(`, `+= (int)`, `-= (int)` across `Craft.java`:
+
+| # | Line | Java Expression | Class. | Reasoning & Discriminating Input Shape | Confidence |
+|---|---|---|:---:|---|:---:|
+| 1 | 77 | `conto.zy -= (int)(5.0f * conto.m.cs.getcos(conto.xy));` | **Case A** | `conto.zy` is `int`, `5.0f * getcos(...)` is `float`. Java bytecode widens LHS to float (`i2f`), subtracts float, and narrows once (`f2i`). Discriminator: `conto.zy` positive (e.g. 5) with fractional subtrahend (e.g. 0.6) yields 4 under Case A vs 5 under Case B. | **HIGH** |
+| 2 | 78 | `conto.xz += (int)(byte0 * 3 * conto.m.cs.getsin(conto.xy));` | **Case A** | LHS is `int`, `byte0 * 3 * getsin(...)` is `float`. LHS widened (`i2f`), float addition, truncated at end (`f2i`). Discriminator: positive accumulator with negative fractional step. | **HIGH** |
+| 3 | 81 | `conto.zy += (int)(5.0f * conto.m.cs.getcos(conto.xy));` | **Case A** | Same structure as Site 1 with addition. LHS widened (`i2f`), float add, narrowed (`f2i`). Discriminator: negative accumulator with positive fractional step. | **HIGH** |
+| 4 | 82 | `conto.xz -= (int)(byte0 * 3 * conto.m.cs.getsin(conto.xy));` | **Case A** | Same structure as Site 2 with subtraction. LHS widened (`i2f`), float sub, narrowed (`f2i`). | **HIGH** |
+| 5 | 124 | `conto.zy += (int)(5.0f * conto.m.cs.getcos(conto.xy));` | **Case A** | Same structure as Site 3. LHS widened (`i2f`), float add, narrowed (`f2i`). | **HIGH** |
+| 6 | 154 | `conto.xz += (int)(Math.random() * (this.speed / 10.0f) - this.speed / 20.0f);` | **Case A** | LHS is `int`, RHS is `double`. LHS widened (`i2d`), double add, narrowed (`d2i`). Downstream of random, but structured as Case A. | **HIGH** |
+| 7 | 155 | `conto.zy += (int)(Math.random() * (this.speed / 10.0f) - this.speed / 20.0f);` | **Case A** | Same structure as Site 6. LHS widened (`i2d`), double add, narrowed (`d2i`). | **HIGH** |
+| 8 | 171 | `conto.y -= (int)this.lift;` | **Case B** | `this.lift` is `double`. Notice Procyon emits `(int)this.lift` without surrounding expression parentheses (explicit cast on simple field read). In bytecode, `d2i` truncates `lift` first, then integer subtracts `isub` from `conto.y`. Discriminator: `lift = 0.5`, `conto.y = 100` — Case B does not change `y` (100 - 0 = 100), whereas Case A would step `y` to 99 every tick. | **HIGH** |
+| 9 | 316 | `lx[n2] -= (int)(this.lspeed[l3] * (conto.m.cs.getsin(this.lxz[l3]) * conto.m.cs.getcos(this.lzy[l3])));` | **Case A** | `lx[n2]` is `int` in `int[]`, RHS is float32 expression (`lspeed * (sin * cos)`). LHS widened (`i2f`), float sub, stored via `iastore` with `f2i`. Discriminator: positive coordinate with fractional step. | **HIGH** |
+| 10 | 319 | `lz[n3] += (int)(this.lspeed[l3] * (conto.m.cs.getcos(this.lxz[l3]) * conto.m.cs.getcos(this.lzy[l3])));` | **Case A** | Same as Site 9 with addition. LHS widened (`i2f`), float add, stored via `iastore` with `f2i`. | **HIGH** |
+| 11 | 322 | `ly[n4] -= (int)(this.lspeed[l3] * conto.m.cs.getsin(this.lzy[l3]));` | **Case A** | Same as Site 9 with single sine term. LHS widened (`i2f`), float sub, narrowed (`f2i`). | **HIGH** |
+| 12 | 340 | `conto.x -= (int)(this.speed * (conto.m.cs.getsin(conto.xz) * conto.m.cs.getcos(conto.zy)));` | **Case A** | LHS is `int`, RHS is float32 speed * trig. LHS widened (`i2f`), float sub, narrowed (`f2i`). Discriminator: accumulator positive, fractional step negative. | **HIGH** |
+| 13 | 341 | `conto.z += (int)(this.speed * (conto.m.cs.getcos(conto.xz) * conto.m.cs.getcos(conto.zy)));` | **Case A** | Same as Site 12 with addition. LHS widened (`i2f`), float add, narrowed (`f2i`). | **HIGH** |
+| 14 | 342 | `conto.y -= (int)(this.speed * conto.m.cs.getsin(conto.zy));` | **Case A** | Same as Site 12 with vertical pitch. LHS widened (`i2f`), float sub, narrowed (`f2i`). | **HIGH** |
+
+---
+
+### Fields Touched and Declared Java Types
+
+| Field | Declared Type | Port Mapping |
+|---|---|---|
+| `u` | `cControl` | `new cControl()` |
+| `rspeed` | `int` | `0` (int) |
+| `speed` | `float` | `0.0` (float32 operations with `fr()`) |
+| `rlift` | `int` | `0` (int) |
+| `lift` | `double` | `0.0` (JS double) |
+| `pexp` | `boolean` | `false` |
+| `ltyp` | `int` | `3` (int) |
+| `lx`, `ly`, `lz`, `lxz`, `lzy`, `lxy` | `int[20]` | `intArray(20)` (Int32Array) |
+| `lstage`, `lspeed`, `lhit`, `nf` | `int[20]` | `intArray(20)` (Int32Array) |
+| `nl` | `int` | `0` (int) |
+| `lsr` | `Lasers` | `new Lasers(medium)` |
+| `skip` | `boolean` | `false` |
+| `bulkc` | `int` | `0` (int) |
+| `sms`, `sx`, `sy`, `sz`, `sxz`, `szy` | `int[4]` | `intArray(4)` (Int32Array) |
+| `ns` | `int` | `0` (int) |
+| `smoke` | `boolean` | `false` |
+| `dms`, `dx`, `dy`, `dz`, `dxz`, `dzy` | `int[4]` | `intArray(4)` (Int32Array) |
+| `nd` | `int` | `0` (int) |
+| `gxz`, `gzy` | `int` | `0` (int) |
+| `responce` | `boolean` | `false` |
+| `trgxz`, `trgzy`, `out`, `turnat`, `tcnt` | `int` | `0` (int) |
+| `engage` | `boolean` | `true` |
+| `enx`, `eny`, `enz`, `ens` | `int` | `0` (int), `ens = 4` |
+| `targeting` | `boolean` | `false` |
+| `mode`, `m3o`, `m3cnt`, `m1cnt` | `int` | `0` (int) |
+| `relax`, `runn`, `liftup` | `int` | `50`, `30`, `500` (int) |
+| `dracs` | `boolean` | `false` |
+
+---
+
+### Preserved Bugs (§3) & Obfuscation Quirks
+
+1. **Obfuscated Char Literals in Trig / Angle Math**:
+   - `char c4 = '´'` (`0x00B4` = 180).
+   - `char c4 = '\uff4c'` (`0xFF4C` = 65356, which represents `(char)-180`).
+   - In expressions like `'Z' + c4 - Math.atan(...) / 0.017453292519943295`: `'Z'` is 90, `0.017453292519943295` is `Math.PI / 180.0`. Preserved exact integer arithmetic values (90 + 180 = 270, 90 + 65356 = 65446).
+2. **Redundant Subtraction Expressions**:
+   - Lines 504–505: `(conto.z + 1000 - conto.z)` — mathematically 1000, but kept verbatim in transpiled form.
+3. **Implicit Float / Double Casts on Speed**:
+   - `(float)0.3` and `(float)i` preserved with `fr()`.
+
+---
+
+### Places Unsure What Java Does
+
+- **`char` Promotion in Angle Inversion (`'\uff4c'`)**:
+  In Java, `char` is unsigned 16-bit (`0..65535`). When `(i7 - this.ly[l3]) < 0`, `c4` is assigned `'\uff4c'` (65356). Then `'Z' + c4` evaluates to `90 + 65356 = 65446` (a large positive angle) before computing `-trunc(...)`. This produces negative pitch angles in the -65000 range. The probe covers this branch to verify the exact Java evaluation.
+
+---
+
+### What the Probe Does NOT Cover
+
+1. **Non-deterministic `Math.random()` simulation paths**:
+   - Random drift on damaged craft (lines 154–155: `conto.xz += ... Math.random()`).
+   - Random enemy retreat coordinate rolls (lines 371–388).
+   - Random AI mode transition rolls under hit condition (lines 474–498).
+   - Random smoke particle position offsets (printed under `--- NONDETERMINISTIC ---` in probe output).
+2. **Specific rare obstacle geometry in `myway`**:
+   - `myway` is probed for both obstacle-detected (`true`) and clear (`false`) paths with synthetic `ContO` bounds; individual polygon-level mesh raycasts inside obstacle models are exercised in `ContO` tests.

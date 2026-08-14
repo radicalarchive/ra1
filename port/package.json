@@ -1,0 +1,9 @@
+{
+  "name": "ra1-js",
+  "private": true,
+  "type": "module",
+  "description": "Native browser port of Radical Aces. See ../decompilation/PORT_SPEC.md",
+  "scripts": {
+    "test": "node --test"
+  }
+}

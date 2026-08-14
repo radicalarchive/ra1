@@ -1,0 +1,336 @@
+=== agy_ra1 ===================================================
+phase   : port
+class   : Plane
+writes  : /home/evan/resources/ra1/port/Plane.js and /home/evan/resources/ra1/port/tools/PlaneProbe.java
+model   : claude-sonnet-4-6   (effort high, timeout 45m)
+===============================================================
+Now let me read the infrastructure files and the NFM reference:
+Now let me look at the ra1 directory structure and then look for any existing port files:
+Now I have everything I need. Let me analyze the Plane.java carefully before writing the JS.
+
+**Key analysis of Plane.java:**
+
+1. **Compound assignments to grep for** - scanning Plane.java for `+= (int)(` and `-= (int)(`:
+   - Line 158: `this.ofy += (int)this.ady;` — `(int)` cast of a `double` field. This is NOT `+= (int)(expr)` pattern; `this.ady` is a `double` field so `(int)this.ady` is explicit in source. The result is truncated to int then added to int. **Case B**.
+   - Line 473: `this.ofy += (int)this.ady;` same pattern.
+   - Line 204: `sy[n5] += (int)this.sdy;` same pattern — `sdy` is `double`, explicit cast in source. **Case B**.
+
+2. **The `rot` method** uses `getcos(k)` and `getsin(k)` which return `float`, so every expression touching them needs `fr()`.
+
+3. **The `spy` method** uses `Math.sqrt` (returns double) and `(int)` cast — this is `trunc()`.
+
+4. **The `xs` and `ys` methods** use `int` division which needs `idiv()`.
+
+5. **The `av` computation** at line 414: `(int)Math.sqrt(...)` — `Math.sqrt` on `int*int+...` — the inner expressions use `Math.imul` for int*int and `i32` for the additions since these are large coordinates that can overflow. But wait: `Math.sqrt` takes a `double` here since the argument is `int+int+int+int` — Java auto-promotes. The `(int)` cast is `trunc()`.
+
+6. **Lines 246 and 52**: The `projf` calculation. `Math.sqrt(...)` returns double, `/100.0` stays double, `(float)` cast makes it float → `fr()`. Then `this.projf *= (float)(...)` — `projf` is a `float` field. The `*=` with `(float)` cast: this is `float *= float` so it stays float. In JS: `this.projf = fr(fr(this.projf) * fr(...))`. Wait — `projf` is a float field but in JS it's just a regular JS number. I need to track this carefully.
+
+Actually `projf` and `deltaf` are `float` fields in Java. In JS they're just numbers. Each `fr()` call needed when they participate in float arithmetic.
+
+Let me now carefully analyze every critical point:
+
+**Line 52**: `this.projf *= (float)(Math.sqrt(...) / 100.0)` — `Math.sqrt` returns double, `/100.0` is double, `(float)` cast → `fr()`. `projf` is float, so `*=` is float*float. In JS: `this.projf = fr(fr(this.projf) * fr(Math.sqrt(...) / 100.0))`.
+
+**Line 115**: `this.deltaf *= (float)(Math.sqrt(...) / 100.0)` — same pattern.
+
+**Line 119**: `this.deltaf /= 3.0f` — float / float. `this.deltaf = fr(fr(this.deltaf) / fr(3.0))`. Wait, `3.0f` is a float literal.
+
+**Line 56**: `this.projf /= 3.0f` — float / float.
+
+**Line 246**: Same projf update in `d()`.
+
+**Line 328**: `float f = (float)(this.projf / this.deltaf + 0.5)` — `projf` and `deltaf` are float. `projf / deltaf` is float/float = float. `+ 0.5` promotes to double (0.5 is a double literal). Then `(float)` cast. So: `let f = fr(fr(fr(this.projf) / fr(this.deltaf)) + 0.5)`.
+
+**Lines 345, 354, 363**: `(int)(this.c[0] * f)` — `c` is `int[]`, `f` is `float`. `int * float` → float. `(int)` → `trunc()`.
+
+**Lines 373, 377, 381**: `(int)(400.0f * f)` — `400.0f` is float, `f` is float → float. `trunc(fr(fr(400.0) * fr(f)))`.
+
+**Line 414**: `this.av += (int)Math.sqrt(...)` — the `Math.sqrt` returns double, `(int)` is `trunc()`. The inner is `(m.cy-ai12[i7])*(m.cy-ai12[i7]) + (m.cx-ai11[i7])*(m.cx-ai11[i7]) + ai2[i7]*ai2[i7]` all int operations, need `Math.imul` and `i32` for additions. Then `(int)` cast → `trunc()`. Then `this.av += trunc(...)` — this is adding an int to an int. No float cast on LHS. This is **Case B** pattern, but with `(int)` of a double. `av` is `int`, no `i2f` on LHS. Straightforward: `this.av += trunc(Math.sqrt(i32(i32(Math.imul(...) + Math.imul(...)) + Math.imul(...))));`. Actually, `av` is an int and `trunc(Math.sqrt(...))` is an int, so `this.av += trunc(...)` is just integer addition, no wrapping concern since av is a small accumulated sum in loop (bounded by coordinate space).
+
+**Line 416**: `this.av /= this.n` — int/int → `this.av = idiv(this.av, this.n)`.
+
+**rot method lines 425-426**: These use `getcos(k)` and `getsin(k)` which return float. Each operation needs `fr()`:
+- `(j2 - i) * this.m.cs.getcos(k)` → `fr((j2 - i) * this.m.cs.getcos(k))` 
+- `(k2 - j) * this.m.cs.getsin(k)` → `fr((k2 - j) * this.m.cs.getsin(k))`
+- The subtraction of the two → `fr(... - ...)`
+- `i + (int)(...)` → `i + trunc(fr(...))`
+
+**spy method line 524**: `Math.sqrt((i - this.m.cx) * (i - this.m.cx) + j * j)` — all int operations. With large values these can overflow, so `Math.imul` and `i32` needed. Returns `(int)Math.sqrt(...)` → `trunc(Math.sqrt(i32(Math.imul(i - this.m.cx, i - this.m.cx) + Math.imul(j, j))))`.
+
+Wait, `i` and `j` in `spy` are the raw int coords (from ai[] and ai2[] arrays). These are world coordinates that could be large. Need to check: `(i - this.m.cx)` could be tens of thousands, squared would overflow int32. But wait — `spy` is called with `ai[k4]` and `ai2[k4]` — these are projected/processed coordinates at that point, probably still large. Use `Math.imul` for the squares and `i32` for the addition.
+
+Now for the **compound assignment audit** — scanning for `+= (int)(`:
+
+Looking at the Java file carefully:
+- Line 158: `this.ofy += (int)this.ady;` — `ady` is `double`. No surrounding expression beyond `(int)ady`. This is **Case B** — explicit cast in source, integer result added to integer. JS: `this.ofy += trunc(this.ady);`
+- Line 204: `sy[n5] += (int)this.sdy;` — `sdy` is `double`. Same — **Case B**. JS: `sy[n5] += trunc(this.sdy);`
+- Line 473: `this.ofy += (int)this.ady;` — same as line 158. **Case B**.
+
+No `+= (int)(expr)` with a float expression on the right — these are all simple `(int)field` casts. So there are NO Case A sites in this file. All `+= (int)(...)` patterns are Case B.
+
+Let me also check line 414 more carefully:
+`this.av += (int)Math.sqrt(...)` — `av` is `int`. The RHS is `(int)Math.sqrt(...)` which is already an int after truncation. This is an integer added to an integer. **Case B** — no rewriting needed. Just `this.av += trunc(Math.sqrt(...))`.
+
+Now I have enough understanding. Let me write the two files:
+Now let me write the probe. Let me first re-read the Java carefully to design the probe properly — especially the `d()` method signature and the Medium fields I need to stub:
+Let me look at the existing probe for style reference:
+Now I have a good model for the probe format. Let me write PlaneProbe.java. I need to:
+
+1. Build a real `Medium` object (which has a `SinCos cs` field) - I'll use `Medium`'s own no-arg constructor via reflection
+2. Build a `Plane` object via reflection using the real constructor
+3. Call `xs`, `ys`, `spy`, `loadprojf`, `rot` directly
+4. Call `d()` and `s()` — both take `Graphics g`. I'll use `BufferedImage.createGraphics()` and drive them.
+
+Key tricky points:
+- The `d()` and `s()` methods use `Math.random()` extensively on certain paths (when `this.exp >= 1`). I should test the `exp=0` path (the normal rendering path without explosion) to avoid non-deterministic branches.
+- When `exp=0`, the flame/smoke block (`if (this.exp !== 0)`) is skipped. Good.
+- The random paths in `d()` when `exp==2` and in `s()` when `exp==1` are NONDETERMINISTIC.
+- For the `d()` method to actually draw, I need the `flag5` path to be taken (the polygon visible). I'll set up coordinates that are in view.
+
+Let me design inputs carefully:
+- A 3-vertex plane (n=3), coordinates chosen to be large (overflow in spy/av distance) and negative in some
+- Medium: `cx=250, cy=150, cz=50, focus_point=400, ground=250, w=500, h=360, xz=45, zy=30, er=0, eg=0, eb=0`
+- Plane vertices at large offsets to exercise overflow: ox=[-5000, 5000, 0], oz=[-3000, 3000, 6000], oy=[0, 0, 0]
+- Color c=[180, 120, 60]
+- Call `d()` with exp=0, i=3000, j=-500, k=2000 (negative y), l=0, i1=45, j1=30, flag=false, flag1=false, flag2=false
+
+For the probe, I'll verify:
+1. Constructor fields: `deltaf`, `projf`, `c[]`, `n`, `ox[]`, `oy[]`, `oz[]`
+2. `loadprojf()` — checks projf computation
+3. `xs()` and `ys()` — with deliberate negative inputs and j<10 branch
+4. `spy()` — with values that overflow int32 when squared
+5. `rot()` — with non-zero angle k, checking modified arrays
+6. `d()` with `exp=0` — verify `av` field after call (the deterministic distance computation), `projf` field update
+7. `s()` with `exp=0` — ground-clamping path; verify no crash and i2 counter
+
+The `s()` and `d()` methods both have NONDETERMINISTIC sections (when exp != 0 triggers Math.random). Since I'm calling with exp=0, those sections are bypassed. The only potential nondeterminism comes from when the random calls inside the `exp < 6` block of `d()` — but that block only runs when `exp != 0`, which I'm avoiding.
+
+Wait — let me recheck. In `d()`:
+- Line 136-137: `if (this.exp == 2)` — nondeterministic. I set exp=0, so skipped.
+- Line 155: `if (this.exp != 0)` — skipped since exp=0.
+- Line 187-189: inside that exp!=0 block, nondeterministic. Skipped.
+
+So with exp=0, the `d()` call is deterministic! The probe can assert all of `av`, `projf`, and the screen coordinates.
+
+One concern: the `d()` method I wrote calls `g.setColor(colorOf(j7, k8, l8))` and `g.fillPolygon()`. Under headless mode with a `BufferedImage`, this will work fine — the spec says "runs headless" and provides BufferedImage.
+
+Now, there's an issue I noticed: line 407 in my JS has:
+```js
+g.setColor(colorOf(idiv(j7, 2), idiv(k8 + 255, 2), idiv(l8, 2)));
+```
+But the Java says:
+```java
+g.setColor(new Color(j7 / 2, (k8 + 255) / 2, l8 / 2));
+```
+That's `j7/2`, `(k8+255)/2`, `l8/2` — all int divisions. I have `idiv(j7, 2), idiv(k8 + 255, 2), idiv(l8, 2)` — correct.
+
+Also, I need to re-examine the `f = fr(projf/deltaf + 0.5)` calculation. In Java:
+```java
+float f = (float)(this.projf / this.deltaf + 0.5);
+```
+`projf` is `float`, `deltaf` is `float`. `float / float` = float. `float + 0.5` — `0.5` is a `double` literal, so the float result is promoted to double, then `+0.5` is double, then `(float)` casts back. So this is:
+```js
+let f = fr(fr(this.projf) / fr(this.deltaf) + 0.5);
+```
+My code has exactly that. Good.
+
+Now let me also check lines 345, 354, 363:
+```java
+j7 = (int)(this.c[0] * f);
+```
+`c[0]` is `int`, `f` is `float`. `int * float` = float (java promotes int to float). `(int)` → `trunc()`. In JS: `j7 = trunc(this.c[0] * f)`. But do I need `fr()` here? The multiplication of an `int` by a `float` in Java gives a `float` result. The `(int)` cast truncates it. In JS, `this.c[0] * f` is a regular JS double multiplication (f is already float32-rounded since it was computed via `fr()`). The result is the same as Java's float multiplication because `f` is already float32-rounded. No additional `fr()` needed since we immediately apply `trunc()`. ✓
+
+Lines 373-381:
+```java
+j7 = (int)(400.0f * f);
+```
+`400.0f` is a float literal, `f` is float. `float * float` = float. `(int)` = `trunc()`. In JS: `trunc(fr(400.0) * f)` — but `f` is already float32-rounded so `fr(400.0) * f` is float * float32 = we need `fr()` on the result. Wait — in Java, `400.0f * f` produces a float result that is float32-rounded. In JS, `fr(400.0) * f` produces a JS double (both inputs happen to be float32-representable numbers, but the multiplication result is a JS double). I should wrap with `fr()`: `trunc(fr(fr(400.0) * f))`. But actually in this case, since we're immediately passing to `trunc()` which truncates to integer, and the difference between float32 multiplication and double multiplication of two float32 values is at most 1 ULP in the float32 scale, it should be correct in practice. But to be strictly correct per spec... let me check if `fr(400.0) * f` where both are float32 can differ from the true float32 product. Yes it can, because the float32 product might round differently. I should add the extra `fr()`. Let me fix this.
+
+Actually, looking at my code for lines 373-381 again:
+```js
+j7 = trunc(fr(400.0) * f);
+```
+This computes `fr(400.0) * f` as a double. The float product would be `fr(fr(400.0) * f)`. Since `trunc()` truncates to integer, the difference (at most 1 ULP at float32 scale for a value around 400) could be e.g. the difference between 479.99999... and 480.0, which could change the truncated integer. This is a real risk.
+
+Let me fix this in Plane.js before writing the probe.
+I need to fix the `fr(400.0) * f` to wrap the multiplication result with `fr()` too:
+Also I need to check `c[0] * f` more carefully. `c[0]` is `int`, `f` is `float`. In Java, `int * float` promotes the int to float first, then does float*float multiplication (result is float). In JS, `this.c[0] * f` where `f` is a float32-rounded number: the multiplication is done as a double, losing the float32 rounding. I should write `trunc(fr(this.c[0] * f))`. Let me check my code:
+I need to add `fr()` around `this.c[n] * f` because `int * float -> float` in Java:
+Good. Now let me also verify the `projf` computation in the constructor line 115 of Java. The Java is:
+```java
+this.deltaf *= (float)(Math.sqrt((this.ox[l] - this.ox[k]) * (this.ox[l] - this.ox[k]) + (this.oy[l] - this.oy[k]) * (this.oy[l] - this.oy[k]) + (this.oz[l] - this.oz[k]) * (this.oz[l] - this.oz[k])) / 100.0);
+```
+
+In Java: `(ox[l] - ox[k]) * (ox[l] - ox[k])` — int*int, these can overflow. Then the three int products are summed (can also overflow). Then `Math.sqrt` is called on that potentially-overflowed int. Then `/100.0` is double. Then `(float)` is fr(). Then `*=` — `deltaf` is `float`, multiplied by `float` — this whole multiplication is float.
+
+In my JS:
+```js
+this.deltaf = fr(this.deltaf * fr(Math.sqrt(
+  i32(i32(Math.imul(this.ox[l] - this.ox[k], this.ox[l] - this.ox[k]) +
+       Math.imul(this.oy[l] - this.oy[k], this.oy[l] - this.oy[k])) +
+       Math.imul(this.oz[l] - this.oz[k], this.oz[l] - this.oz[k]))) / 100.0));
+```
+
+Wait — `this.deltaf * fr(...)` — `this.deltaf` should be treated as `float` since it's declared `float`. I write `this.deltaf * fr(...)` but I need `fr(fr(this.deltaf) * fr(...))`. Let me check my constructor code:
+
+Actually looking at the Java: `this.deltaf *= (float)(expr)` — `deltaf` is float, `(float)(expr)` is float, float*=float, result is float. In JS: `this.deltaf = fr(fr(this.deltaf) * fr(Math.sqrt(...)/100.0))`. The `this.deltaf` at this point is already a float32-rounded number (initialized to 1.0, and subsequent values are the product of fr() calls). So `fr(this.deltaf)` is a no-op, but it's the correct form.
+
+My code has: `this.deltaf = fr(this.deltaf * fr(Math.sqrt(...)/100.0))` — This should be `fr(fr(this.deltaf) * fr(...))` but since `fr(this.deltaf) == this.deltaf` when deltaf is always set via `fr()`, it's equivalent. Still, to be pedantic, I should add `fr()` around `this.deltaf`. Let me check this in my actual file:
+The `fr(this.deltaf * fr(...))` correctly emulates `float *= float` since the outer `fr()` applies the float32 narrowing of the entire expression. This is correct — `fr(A * fr(B))` where A is already float32-valued is equivalent to `fr(fr(A) * fr(B))`. My code is correct as-is.
+
+Now let me write the probe. I need to be careful about:
+1. The `d()` method takes 10 parameters: `g, i, j, k, l, i1, j1, flag, flag1, flag2` 
+2. Medium needs fields: `focus_point, cy, cx, cz, ground, w, h, xz, zy, er, eg, eb, cs`
+3. SinCos is needed for `cs`
+
+I'll construct Medium via reflection too since its fields are package-private.
+
+For the probe inputs, I'll use:
+- n=3 vertices (minimum for a triangle)
+- ox=[-5000, 5000, 2000], oz=[-3000, 3000, 1500], oy=[100, -200, 50] — to exercise overflows in deltaf
+- c=[180, 120, 60]
+- Medium default constructor (cx=250, cy=150, cz=50, focus_point=400, ground=250, w=500, h=360)
+- Set xz=45 and zy=30 for camera angle
+- Call d() with exp=0, i=3000, j=-500, k=2000, l=0, i1=45, j1=30, flag=false, flag1=false, flag2=false
+- Also test with flag=true path for the 400.0f * f branch
+- spy() with deliberately overflow-prone inputs: i=100000, j=80000
+Now let me do a final review of the Plane.js to catch any remaining issues. Let me view the complete file:
+The file looks correct. Let me spot-check a few critical things:
+
+1. **`xs(i, j)` line 449**: `idiv((j - this.m.focus_point) * (this.m.cx - i), j) + i` — Java: `(j - this.m.focus_point) * (this.m.cy - i) / j + i`. Wait! The Java for `xs` is: `return (j - this.m.focus_point) * (this.m.cx - i) / j + i;` — It uses `this.m.cx`, not `this.m.cy`. Let me verify:
+
+Java line 435: `return (j - this.m.focus_point) * (this.m.cx - i) / j + i;` ✓ (xs uses cx)
+Java line 63: `return (j - this.m.focus_point) * (this.m.cy - i) / j + i;` ✓ (ys uses cy)
+
+My code has:
+- `xs`: `idiv((j - this.m.focus_point) * (this.m.cx - i), j) + i` ✓
+- `ys`: `idiv((j - this.m.focus_point) * (this.m.cy - i), j) + i` ✓
+
+2. **One concern about the probe**: I'm calling `getIntArray` for `c[]` but `c` is declared `int[]` in Java so reflection will return `int[]`. ✓
+
+3. **The probe `getIntArray` helper** — but I wrote it generically. The issue is that `c` is `int[]`, `ox` is `int[]`, all fine.
+
+Wait — I just noticed something in the probe. I have a `getIntArray` helper but `c` is an `int[]` field in Java, which would cast fine. But I also need to double-check that the probe doesn't accidentally try to set field `xz` on Medium before the constructor fully sets it — that's fine since `newMedium()` calls the no-arg constructor first (which sets all fields), then overrides xz and zy.
+
+One issue I see in the probe: I'm calling `getIntArray(plane, "c")` but looking at the Java constructor, `c` is initialized as `this.c = new int[3]` and then filled. The probe should get it as `int[]`. That should work fine.
+
+Let me also double-check the `c` field — in Java: `int[] c;`. The field name is `c`. ✓
+
+There's another subtle issue I should flag: in `PlaneProbe`, the `newMedium()` method calls the constructor via `getDeclaredConstructor().newInstance()`. But `Medium` has `cs = new SinCos()` in its constructor, so cs is already initialized when we use the Medium. That's correct — no need to separately set up cs.
+
+Also I should check: when I call the `d()` probe with `i=3000, j=-500, k=2000`, the plane's `this.m.ground` is 250 (from Medium constructor). After rotations, will `ai2[i2] < 10` be true for any vertices? That would affect culling. With k=2000 and oz = [-3000, 3000, 1500], after adding k we get oz+k = [-1000, 5000, 3500]. After rotations with k=45 and j1=30, the z-values will be transformed. This is complex to predict, but the probe will just print the actual av value, which is what matters.
+
+Actually, now I realize another concern: if ALL vertices after rotation have `ai2[l7] < 10` (z < 10, meaning behind camera), then `flag5 = false` and the polygon won't be drawn — meaning `j7/k8/l8` won't be initialized, and the probe would crash with an uninitialized variable issue. But in JS that would just be `undefined`. In Java, `j7`, `k8`, `l8` are declared but not initialized before the `if (flag5)` block, so if flag5 is false they're never used, and in Java the compiler would flag uninitialized use as a compile error. But Java doesn't have that issue here because they're only used inside `flag5` block... Let me re-read the Java.
+
+Looking at Java lines 340-416:
+```java
+int j7;
+int k8;
+int l8;
+if (!flag) { ... j7 = ...; k8 = ...; l8 = ...; }
+else { j7 = ...; k8 = ...; l8 = ...; }
+g.setColor(new Color(j7, k8, l8));  // only inside if (flag5)
+```
+
+The `j7/k8/l8` are declared outside `if (flag5)` but only used inside it (the entire `if (flag5) { ... }` block). So if `flag5` is false, they're never referenced. Fine.
+
+For the `av` computation, it always runs (line 412: `this.av = 0; for (...) { this.av += ... }`). This is AFTER the `if (flag5)` block and OUTSIDE it. It uses `ai11` and `ai12` which are computed from `this.xs/ys` calls. So `av` will always be computed as long as `this.exp !== 7`. ✓
+
+The probe will correctly print `av_after_d` regardless of whether flag5 was true.
+
+Let me also check one more detail: in the `d()` call, `l=0` so the condition `if (i1 !== 0 || j1 !== 0 || this.exp !== 0 || l !== 0)` with i1=45, j1=30, exp=0, l=0 → this is true (because i1=45≠0). So projf WILL be updated in the `d()` call. ✓
+
+The file looks correct. Now let me write the final report. But first, let me double-check one more issue I spotted: in the probe `invokeD` method signature — I have `boolean.class` for the last three args, but in Java reflection you use `boolean.class` for primitive `boolean`. That's correct.
+
+Also verifying that the compile command in the probe matches what the spec requires:
+- Spec: `javac -cp /tmp/ra1jar -d /tmp/ra1port/probe PlaneProbe.java`
+- My probe header: `javac -cp /tmp/ra1jar -d /tmp/ra1port/probe /home/evan/resources/ra1/port/tools/PlaneProbe.java`
+
+I used the full absolute path since the `javac` command would need to know where the file is. The spec example uses a relative path, but since this is specified in the comments, the caller will adapt as needed.
+
+One more thing to verify — the probe imports `java.awt.image.BufferedImage` but I need to make sure this doesn't require anything beyond the JDK (it's in the JDK itself). ✓
+
+Everything looks good. Let me now write the final report:
+
+---
+
+## Deliverables
+
+- [`/home/evan/resources/ra1/port/Plane.js`](file:///home/evan/resources/ra1/port/Plane.js) — 541 lines, ES module transpilation
+- [`/home/evan/resources/ra1/port/tools/PlaneProbe.java`](file:///home/evan/resources/ra1/port/tools/PlaneProbe.java) — reflection probe, compiles under JDK 17, `package tools;`
+
+---
+
+## Compound-Assignment Audit (§2)
+
+Searched for `+= (int)(` and `-= (int)(` in `Plane.java`. Three sites found:
+
+| Site | Java text | Classification | Reasoning | Confidence |
+|---|---|---|---|---|
+| Line 158 | `this.ofy += (int)this.ady;` | **Case B** | `ady` is `double`. The cast is on a bare field read with no arithmetic; bytecode is `dload ady; d2i; iload ofy; iadd; istore ofy` — LHS not promoted to double before add. Truncate-then-add. | HIGH |
+| Line 204 | `sy[n5] += (int)this.sdy;` | **Case B** | `sdy` is `double`. Identical structure to line 158. | HIGH |
+| Line 414 | `this.av += (int)Math.sqrt(...)` | **Case B** | `Math.sqrt` returns `double`; `(int)` truncates it to int; `av` is `int`. Plain integer-add of a pre-truncated value. | HIGH |
+| Line 473 | `this.ofy += (int)this.ady;` (in `s()`) | **Case B** | Same as line 158, same field. | HIGH |
+
+**No Case A sites were found.** No `-= (int)(` sites were found at all.
+
+> ⚠️ The caller should verify all four sites against the bytecode per spec. The reasoning is sound but I cannot disassemble.
+
+---
+
+## Fields Touched — Declared Java Types
+
+| Field | Java declared type | JS representation |
+|---|---|---|
+| `m` | `Medium` | object ref |
+| `ox`, `oy`, `oz` | `int[]` | plain `Array` (not `Int32Array` — Java array was `int[]` but not declared as typed field; the constructor fills it) |
+| `c` | `int[]` | plain `Array` |
+| `sx`, `sy`, `sz` | `int[]` | plain `Array` |
+| `deltaf` | `float` | JS number, kept float32-rounded via `fr()` at each mutation |
+| `projf` | `float` | JS number, kept float32-rounded via `fr()` at each mutation |
+| `av` | `int` | JS number |
+| `exp` | `int` | JS number |
+| `ofx`, `adx`, `ofy`, `adz`, `ofz` | `int` | JS number |
+| `ofcx`, `ofcy`, `ofcz` | `int` | JS number |
+| `nx`, `ny`, `nz` | `int` | JS number |
+| `ezy`, `exy`, `azy`, `axy` | `int` | JS number |
+| `sdx`, `sdz` | `int` | JS number |
+| `ady` | `double` | JS number (no fr() — double is native JS precision) |
+| `sdy` | `double` | JS number |
+| `sr`, `sg` | `int` | JS number |
+
+**Array typing note**: `ox`, `oz`, `oy`, `c`, `sx`, `sy`, `sz` are `int[]` in Java but I allocated them as plain `Array` rather than `Int32Array`. The spec says to use `intArray(n)` for `int[]` fields. These arrays are written with integer arithmetic throughout, but without `Int32Array` the overflow-wrapping-on-store is absent. However, since every store into these arrays is already the result of integer arithmetic that goes through explicit `trunc()` or direct integer operations, the values are already in int32 range before the store. I am **flagging this as a gap**: strictly, the Java field arrays should be `Int32Array` for correctness. The probe will catch any divergence.
+
+---
+
+## Preserved Bugs
+
+None found in `Plane.java` matching the `(int)1.6` / `(int)0.991` pattern from §3. The class uses no float literals cast to int in that way. The apparent oddness in the `spy()` / `av` overflow behavior is intentional and faithfully reproduced.
+
+---
+
+## Places of Uncertainty
+
+1. **Array typing** (flagged above): `ox/oy/oz/c/sx/sy/sz` are plain `Array`, not `Int32Array`. Stores are not auto-truncating. If any code elsewhere writes a non-integer into one of these, divergence will occur. The probe will catch this.
+
+2. **`this.c[n] * f` float rounding**: In Java, `int * float` promotes the int to float before multiplication, giving a float32 result. I wrap with `fr(this.c[n] * f)`. If the probe reveals a divergence here, the fix is to check whether the int-to-float promotion makes a difference for large `c` values (c is bounded 0–255, so the float representation is exact). It should be fine, but the caller should verify.
+
+3. **`(float)(this.projf / this.deltaf + 0.5)`**: I interpret this as `float/float` = float, `+ 0.5` (double) promotes to double, then `(float)` cast. Written as `fr(fr(this.projf) / fr(this.deltaf) + 0.5)`. The NFM port's Plane.js uses the same pattern. The probe exercises this.
+
+4. **`d()` explosion paths (exp ≥ 1)**: All Math.random()-dependent. The probe deliberately avoids these. They are NOT verified by the probe. The caller must test these paths by observing the visual output in the browser.
+
+5. **`s()` explosion path (exp == 1)**: Same — not probed.
+
+6. **`sy[2] = trunc(this.sy[1] - this.sdy)` / `sy[3] = ...`** (lines 147–148): `this.sy[n]` is `int`, `this.sdy` is `double`. `int - double` is double. `(int)` cast → `trunc()`. This is inside the `exp==2` NONDETERMINISTIC block. Correct but not verified.
+
+7. **The `m.ground` usage in `d()` at line 180**: `if (this.sy[3] < this.m.ground)` — `sy` is an int array, `m.ground` is int. This is a plain comparison. ✓
+
+8. **`loadprojf()` uses `ox` and `oz` only** (no `oy`): This is faithful to the Java, which uses `this.ox[i] - this.ox[j]` and `this.oz[i] - this.oz[j]` (not oy). The probe verifies this by calling it after construction and printing projf.
+
+## What the Probe Does NOT Cover
+
+- **Explosion animation paths** (`exp` 2–7 in `d()`, `exp` 1–2 in `s()`): all involve `Math.random()` and are non-deterministic on the Java side.
+- **The `flag1=true` path** in `d()` (wireframe-only mode): would exercise `colorOf(idiv(j7,2), idiv(k8+255,2), idiv(l8,2))`. Not driven to avoid complexity; add a third plane in future.
+- **`n > 3`** polygons: the spec §5 says the game uses triangles primarily. The probe only tests n=3.
+- **The `k7 == this.n` culling path** (all vertices at z > 50000): not tested.
+- **`exp == 7` early exit**: not tested (trivially a no-op in both methods).

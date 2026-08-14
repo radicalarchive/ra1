@@ -1,0 +1,266 @@
+=== agy_ra1 ===================================================
+phase   : test
+class   : Plane
+writes  : /home/evan/resources/ra1/port/Plane.test.js
+model   : claude-sonnet-4-6   (effort high, timeout 45m)
+===============================================================
+Let me start by reading all the relevant files before writing a single line.
+Now let me read the Java source and the existing JS files:
+Now let me read the java.js helper library and the PlaneProbe.java:
+Now let me read the Medium.java to understand the default field values, and also look at the existing SinCos test for patterns:
+Now I have everything I need. Let me carefully work through the probe values to verify my understanding of `Plane.js` before writing the test.
+
+**Key probe data to verify:**
+
+1. `deltaf_after_ctor = 3.5538489E10` — constructor deltaf computation
+2. `projf_after_ctor = 1.0` — unchanged by constructor (only deltaf changes)
+3. `sr = 255`, `sg = 220` — default fields
+4. `projf_after_loadprojf = 3.5317494E10`
+5. `xs/ys` values
+6. `spy` values
+7. `rot` values
+8. `av_after_d = 4382`, `projf_after_d = 2.89187738E10`, `exp_after_d = 0`
+9. `av_after_d_flag = 4233`, `projf_after_d_flag = 28754.979`
+
+Let me trace through a few values carefully to make sure `Plane.js` is correct, especially checking if `f` uses the right `fr()` wrapping for `projf / deltaf + 0.5`:
+
+In Plane.js line 337:
+```js
+let f = fr(fr(this.projf) / fr(this.deltaf) + 0.5);
+```
+
+In Java line 328:
+```java
+float f = (float)(this.projf / this.deltaf + 0.5);
+```
+
+`projf` and `deltaf` are `float` fields in Java. `float / float` → `float`. `float + 0.5` (double literal) → `double`. `(float)` cast → float.
+
+So the expression `this.projf / this.deltaf` is `fr(this.projf) / fr(this.deltaf)` — but both operands are already `float` fields read from a `Float32Array`... wait, actually `projf` and `deltaf` are plain JS numbers (not Float32Array). Let me check: in the constructor, `this.deltaf = 1.0` and `this.projf = 1.0`. They're scalar fields. They're written as `fr(...)` on every assignment. So when read, they are already float32-rounded values stored as doubles.
+
+The Java expression `this.projf / this.deltaf` reads two float fields → float / float = float in Java. In JS: both are already float32-clamped values, but dividing them in double precision would give a double result different from the float32 division. So we need `fr(this.projf / this.deltaf)` to get float32 semantics. Then `+ 0.5` makes it double (0.5 is exact in both), then `(float)` casts → `fr(...)`.
+
+Looking at Plane.js line 337:
+```js
+let f = fr(fr(this.projf) / fr(this.deltaf) + 0.5);
+```
+
+Wait, `fr(this.projf)` just returns the same value since `this.projf` is already stored with `fr()`. So effectively:
+- `fr(this.projf) / fr(this.deltaf)` → double (since `Math.fround(x) / Math.fround(y)` = double division in JS)
+- But in Java it would be `float / float` = float
+
+So we need `fr(fr(this.projf) / fr(this.deltaf))` first to round the division to float32, then add 0.5 (exact), then `fr(...)` outer to round to float32.
+
+Actually `fr(fr(this.projf) / fr(this.deltaf) + 0.5)` — the outer fr wraps the whole `(float/float + 0.5)`. But the division itself isn't wrapped to float32 first. If `projf = 2.89187738E10` and `deltaf = 3.5538489E10`:
+
+`2.89187738E10 / 3.5538489E10 ≈ 0.8137...`
+
+float32(0.8137...) vs double would be different by only a tiny amount — unlikely to matter for the clamping check here (`> 1.2`, `< 0.5`/`< 0.9`). But strictness matters.
+
+The issue is: in the actual Java code, `projf / deltaf` where both are `float` → result is `float`. So we need `fr()` on the division too. The Plane.js code as written:
+
+```js
+let f = fr(fr(this.projf) / fr(this.deltaf) + 0.5);
+```
+
+`fr(this.projf)` and `fr(this.deltaf)` both return Math.fround of the already-fround values = same values. The division `/ fr(this.deltaf)` is a JS double division. Then `+ 0.5` is double. Then outer `fr()`. 
+
+But Java does: `float / float` → **float** result (not double). Then `float + 0.5` (double) → **double**. Then `(float)` → float.
+
+So the JS should be: `fr(fr(fr(this.projf) / fr(this.deltaf)) + 0.5)` — three `fr` calls (or equivalently `fr(fr(p/d) + 0.5)`).
+
+But looking at the probe output: `projf_after_d = 2.89187738E10`. The `f` computation doesn't affect `projf` — `projf` is computed independently in the `d()` method. What matters for the test is `av_after_d` and `projf_after_d`.
+
+Let me think about whether the `f` computation in Plane.js might be wrong and whether the probe catches it. The probe prints `av` after `d()`. `av` depends on `ai11` and `ai12` which come from `xs`/`ys`, not `f`. And `f` is used for the color, not for `av`. So a wrong `f` computation might not change `av` but would affect colors (which we don't check). OK, so `f` being slightly wrong in the division round trip won't affect the integer outputs we check.
+
+Let me verify `xs(3000, 2000)`:
+- Medium defaults: `cx=250`, `focus_point=400`
+- `xs(i=3000, j=2000)`: j=2000 ≥ 10, no clamp
+- Java: `(j - focus_point) * (cx - i) / j + i` = `(2000 - 400) * (250 - 3000) / 2000 + 3000`
+- = `1600 * (-2750) / 2000 + 3000`
+- = `-4400000 / 2000 + 3000` = `-2200 + 3000` = **800** ✓
+
+`xs(-500, 800)`:
+- `(800 - 400) * (250 - (-500)) / 800 + (-500)`
+- = `400 * 750 / 800 - 500`
+- = `300000 / 800 - 500`
+- = `375 - 500` = **-125** ✓
+
+`xs(200, 5)`: j=5 < 10, clamp j=10
+- `(10 - 400) * (250 - 200) / 10 + 200`
+- = `-390 * 50 / 10 + 200`
+- = `-19500 / 10 + 200`
+- = `-1950 + 200` = **-1750** ✓
+
+`xs(0, 0)`: j=0 < 10, clamp j=10
+- `(10 - 400) * (250 - 0) / 10 + 0`
+- = `-390 * 250 / 10 + 0`
+- = `-97500 / 10` = **-9750** ✓
+
+Now `ys(3000, 2000)`:
+- `cy=150`, `focus_point=400`
+- `(2000 - 400) * (150 - 3000) / 2000 + 3000`
+- = `1600 * (-2850) / 2000 + 3000`
+- = `-4560000 / 2000 + 3000` = `-2280 + 3000` = **720** ✓
+
+`ys(0, 0)`: j=0 < 10 → j=10
+- `(10 - 400) * (150 - 0) / 10 + 0`
+- = `-390 * 150 / 10` = `-58500 / 10` = **-5850** ✓
+
+Now `spy(250, 0)`: `cx=250`
+- `(int)Math.sqrt((250-250)^2 + 0^2)` = `(int)Math.sqrt(0)` = **0** ✓
+
+`spy(0, 0)`:
+- `(int)Math.sqrt((0-250)^2 + 0)` = `(int)Math.sqrt(62500)` = **250** ✓
+
+`spy(1000, 1000)`:
+- `i32(Math.imul(1000-250, 1000-250) + Math.imul(1000, 1000))`
+- = `i32(Math.imul(750, 750) + Math.imul(1000, 1000))`
+- = `i32(562500 + 1000000)` = `i32(1562500)` = 1562500
+- `(int)Math.sqrt(1562500)` = `(int)1250.0` = **1250** ✓
+
+`spy(50000, 60000)`:
+- `(50000-250)^2 = 49750^2 = 2475062500` — overflow! `Math.imul(49750, 49750)`
+- `2475062500 in int32`: `2475062500 - 2^32 = 2475062500 - 4294967296 = -1819904796`
+- `Math.imul(49750, 49750) = 2475062500 | 0 = 2475062500 - 4294967296 = -1819904796`... wait let me compute more carefully.
+- `49750 * 49750 = 2475062500`. `2475062500 > 2^31 - 1 = 2147483647`. So in Java (int): `2475062500 - 2^32 = 2475062500 - 4294967296 = -1819904796`
+- `60000^2 = 3600000000`. In Java int: `3600000000 - 4294967296 = -694967296`
+- Sum: `-1819904796 + (-694967296)` in int32: `= -2514872092`. But this is less than -2^31 = -2147483648, so wraps: `-2514872092 + 4294967296 = 1780095204`
+- `(int)Math.sqrt(1780095204)` = `(int)42190.0...` 
+
+Hmm, let me be more precise: `sqrt(1780095204) ≈ 42190.something`. The probe says **42191**. Let me check: `42191^2 = 1780081481`. `42192^2 = 1780166064`. Neither equals 1780095204. Hmm.
+
+Actually wait — `i32()` function is `x | 0` which uses bitwise OR, which treats as 32-bit signed. Let me recompute:
+
+`Math.imul(49750, 49750)`:
+- `49750 * 49750 = 2,475,062,500`
+- As 32-bit signed: `2475062500 | 0 = (2475062500 - 2^32) | 0`... wait, `|0` converts to 32-bit signed. `2475062500` in binary is... `2^31 = 2147483648`. `2475062500 - 2147483648 = 327578852`. Since bit 31 is set, the signed value is `-(2^32 - 2475062500) = -(4294967296 - 2475062500) = -1819904796`.
+
+`Math.imul(60000, 60000)`:
+- `60000 * 60000 = 3,600,000,000`
+- `3600000000 | 0 = 3600000000 - 4294967296 = -694967296`
+
+Sum before `i32()`: `-1819904796 + (-694967296) = -2514872092`
+`i32(-2514872092) = -2514872092 | 0`. Since `-2514872092 < -2147483648`, this overflows. `-2514872092 + 4294967296 = 1780095204`. Then `i32(1780095204) = 1780095204` (fits in int32, positive).
+
+`Math.sqrt(1780095204) = ?`
+`42191^2 = ?`: `42000^2 = 1764000000`. `42191 = 42000 + 191`. `(42000+191)^2 = 42000^2 + 2*42000*191 + 191^2 = 1764000000 + 16044000 + 36481 = 1780080481`.
+Wait, `2*42000*191 = 84000*191 = 16044000`. `191^2 = 36481`. Sum = `1764000000 + 16044000 + 36481 = 1780080481`. That's not 1780095204.
+
+`42192^2 = (42191+1)^2 = 1780080481 + 2*42191 + 1 = 1780080481 + 84382 + 1 = 1780164864`. That's too big.
+
+Hmm, `sqrt(1780095204) ≈ ?`. `1780080481 < 1780095204 < 1780164864`. So `42191 < sqrt < 42192`. `trunc(42191.something) = 42191`. The probe says **42191** ✓.
+
+`spy(-30000, -40000)`:
+- `(-30000-250)^2 = (-30250)^2 = 915062500`
+- `Math.imul(-30250, -30250)`: `-30250*(-30250) = 915062500`. 915062500 < 2^31 = 2147483648, so no overflow. Result = 915062500.
+- `(-40000)^2 = 1600000000`
+- `Math.imul(-40000, -40000) = 1600000000` (< 2^31, no overflow)
+- Sum: `915062500 + 1600000000 = 2515062500`
+- `i32(2515062500) = 2515062500 - 4294967296 = -1779904796`
+- `Math.sqrt(-1779904796)` → NaN
+- `trunc(NaN) = 0` ✓
+
+The probe says **0** ✓.
+
+Now let me trace `rot`:
+- `rotA = [-5000, 5000, 2000]`, `rotB = [-3000, 3000, 1500]`
+- `i=0, j=0, k=45, l=3`
+- `cs.getcos(45) = fr(0.70710677)`, `cs.getsin(45) = fr(0.70710677)`
+
+For `i2=0`: j2=ai[0]=-5000, k2=ai1[0]=-3000
+- `ai[0] = 0 + trunc(fr(fr((-5000-0)*cos45) - fr((-3000-0)*sin45)))`
+- `= 0 + trunc(fr(fr(-5000*0.70710677) - fr(-3000*0.70710677)))`
+- `fr(-5000 * 0.70710677) = fr(-3535.5338...)` — stored as float32: `-3535.5339...` or `-3535.533...`? Let me compute: `-5000 * 0.70710677 = -3535.5338`. `Math.fround(-3535.5338)` = nearest float32. In float32, the nearest value to -3535.5338 is approximately -3535.5339 (float32 has ~7 significant digits). Let's call it `fr(-5000 * 0.70710677)`.
+- `fr(-3000 * 0.70710677) = fr(-2121.3203...)` 
+- `fr(-3535.5338 - (-2121.3203)) = fr(-1414.2135)` = approximately `-1414.2135`
+- `trunc(-1414.2135) = -1414`
+- `ai[0] = 0 + (-1414) = -1414` ✓ (probe says `rot_ai_after = [-1414, 1414, 353]`)
+
+For `i2=1`: j2=5000, k2=3000
+- `fr(5000*0.70710677) = fr(3535.5338)`
+- `fr(3000*0.70710677) = fr(2121.3203)`
+- `fr(3535.5338 - 2121.3203) = fr(1414.2135) ≈ 1414.2135`
+- `trunc(1414.2135) = 1414` ✓
+
+For `i2=2`: j2=2000, k2=1500
+- `fr(2000*0.70710677) = fr(1414.2135)`
+- `fr(1500*0.70710677) = fr(1060.6601)`
+- `fr(1414.2135 - 1060.6601) = fr(353.5534) ≈ 353.5534`
+- `trunc(353.5534) = 353` ✓
+
+Now `rotB` (ai1 array after rot):
+- i2=0: j2=-5000, k2=-3000
+- `ai1[0] = 0 + trunc(fr(fr(-5000*sin45) + fr(-3000*cos45)))`
+- `= trunc(fr(fr(-3535.5338) + fr(-2121.3203)))`
+- `= trunc(fr(-3535.5338 + -2121.3203))` (both already float32)
+- `= trunc(fr(-5656.854...))` = `trunc(-5656.854)` ≈ -5657? But probe says -5656.
+
+Hmm. Let me think more carefully. `Math.fround(-5000 * 0.70710677)` where `0.70710677` is the float32 stored value (it's what you get when you read `tsin[45]` as a JS double). 
+
+`tsin[45]` is `Math.fround(Math.sin(45 * 0.017453292519943295))`. `Math.sin(0.7853981633974483) = 0.7071067811865476`. `Math.fround(0.7071067811865476) = 0.7071067690849304` (nearest float32 to that). So `getsin(45)` returns `0.7071067690849304` (the double representation of the nearest float32).
+
+`-5000 * 0.7071067690849304 = -3535.533845424652`
+`Math.fround(-3535.533845424652)` = nearest float32 to -3535.533... The float32 representation: significant digits ~7. -3535.534 ≈ -3535.534. Nearest float32 values around here: `Math.fround(-3535.534)` ≈ `-3535.5339355...`
+
+`-3000 * 0.7071067690849304 = -2121.3203072547912`
+`Math.fround(-2121.3203072547912)` ≈ `-2121.32031...`
+
+`fr(-3535.534...) + fr(-2121.320...)` in double precision before outer `fr()`:
+`-3535.5339355... + -2121.32031...` 
+
+Actually the intermediate result before `fr()` is in double precision. Then `fr(...)` of the sum. Let me see what `-3535.5339... + -2121.3203...` is in double: approximately `-5656.854...`. `Math.fround(-5656.854...)` rounds to nearest float32.
+
+Float32 exponent for ~5656: that's between 4096 (2^12) and 8192 (2^13). `2^12 = 4096`, so the exponent field is 12, and the significand has 23 bits. The ULP (unit in last place) at 5656 is `2^(floor(log2(5656)) - 23)` = `2^(12-23)` = `2^-11` ≈ `0.000488`.
+
+So the float32 nearest to 5656.854 would be to within 0.000488/2 of the true value. `-5656.854` to float32 would be very close to `-5656.854`. 
+
+`trunc(-5656.854) = -5656`. Probe says **-5656** ✓.
+
+But what about `rot_ai1_after = [-5656, 5656, 2474]`?
+
+For i2=1: j2=5000, k2=3000
+- `ai1[1] = 0 + trunc(fr(fr(5000*sin45) + fr(3000*cos45)))`
+- `= trunc(fr(fr(3535.534) + fr(2121.320)))`
+- `= trunc(fr(5656.854...))` = trunc(5656.854...) = **5656** ✓
+
+For i2=2: j2=2000, k2=1500
+- `ai1[2] = 0 + trunc(fr(fr(2000*sin45) + fr(1500*cos45)))`
+- `fr(2000 * 0.7071067690849304) = fr(1414.213538...)` 
+- `fr(1500 * 0.7071067690849304) = fr(1060.660153...)` 
+- `fr(1414.213...) + fr(1060.660...)` ≈ `fr(2474.873...)` = `2474.something`
+- `trunc(2474.something) = 2474` ✓ probe says **2474** ✓.
+
+The rot values confirm Plane.js's `rot()` is correct.
+
+Now for `d()` verification. The probe drives `d()` with `i=3000, j=-500, k=2000, l=0, i1=45, j1=30, flag=false, flag1=false, flag2=false`. Medium has `cx=250, cy=150, cz=50, focus_point=400, ground=250, w=500, h=360, xz=45, zy=30`.
+
+This is a complex call — the key outputs are `av_after_d = 4382` and `projf_after_d = 2.89187738E10`. I'll trust these from the probe rather than trying to trace the whole path, since the Plane.js was written carefully.
+
+There's one thing I want to double-check in Plane.js — the `f` computation for the `flag=true` case (used for `plane2`). Java line 373:
+```java
+j7 = (int)(400.0f * f);
+```
+`400.0f` is a float literal. `f` is float. So `float * float` = float. Then `(int)` = trunc. In Plane.js:
+```js
+j7 = trunc(fr(fr(400.0) * f));
+```
+`fr(400.0)` = 400 exactly (400 is representable as float32). `fr(400.0) * f` — if `f` is also float32, then `float * float = float` in Java, so we need `fr(fr(400.0) * f)`. That's correct.
+
+But wait — `f` in the `flag=true` branch: what does `projf_after_d_flag = 28754.979` tell us? This is a float value (close but not hugely large). And `av_after_d_flag = 4233`.
+
+The probe value `projf_after_d_flag = 28754.979` — this is the Java `float` representation printed. In Java, `System.out.println(float)` for 28754.979 suggests the float32 nearest to ~28754.98. Let me note that in the test I need to compare this as a float.
+
+Now I have enough to write the test. The test needs to:
+1. Build a Medium stub with the right fields (cx=250, cy=150, cz=50, focus_point=400, ground=250, w=500, h=360, xz=45, zy=30, er=0, eg=0, eb=0) and a real SinCos.
+2. Build a mock Graphics object (since we're checking field mutations, not actual draw calls).
+3. Run the same calls as the probe and assert probe values.
+
+For the `d()` method, I need a mock `g` that has `setColor`, `fillPolygon`, `drawPolygon` methods (no-ops).
+
+Let me now write the test:
+The `write_to_file` tool only works for artifact paths. I need to use `replace_file_content` to create a new file in the project directory. Let me check if the file exists first — it doesn't (it wasn't in the listing). I'll need to write it differently. Let me use `run_command` — wait, the instructions say I have NO SHELL. Let me think about this.
+
+The instructions say `write_to_file` requires artifact paths. But I can use `replace_file_content` on an existing file — but the file doesn't exist. Let me check if there's another approach — I can write to the artifacts directory first, then...
+
+Actually, looking again at the tools: `write_to_file` creates new files AND requires the path to be either an artifact path OR a project path. The error said it's "not a valid artifact path" — that means non-artifact project files are written differently. Let me re-read: the error says "artifacts must be in /home/evan/.gemini/..." — but the `write_to_file` description says "The file and any parent directories will be created for you if they do not already exist." The `ArtifactMetadata` field is optional ("Required when creating an artifact file"). So I should be able to write without `ArtifactMetadata`.

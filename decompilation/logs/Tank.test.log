@@ -1,0 +1,92 @@
+=== agy_ra1 ===================================================
+phase   : test
+class   : Tank
+writes  : /home/evan/resources/ra1/port/Tank.test.js
+model   : gemini-3.7-flash-medium   (effort high, timeout 45m)
+===============================================================
+# Differential Test Suite: [`Tank.test.js`](file:///home/evan/resources/ra1/port/Tank.test.js)
+
+Created [`/home/evan/resources/ra1/port/Tank.test.js`](file:///home/evan/resources/ra1/port/Tank.test.js) asserting all literal numbers produced by the Java probe [`/home/evan/resources/ra1/port/tools/TankProbe.java`](file:///home/evan/resources/ra1/port/tools/TankProbe.java) recorded in [`/home/evan/resources/ra1/decompilation/logs/Tank.probe.txt`](file:///home/evan/resources/ra1/decompilation/logs/Tank.probe.txt).
+
+---
+
+## 1. What Was Asserted
+
+All values asserted are literal figures directly matching the probe output:
+
+1. **Constructor & Initial Fields**:
+   - `rspeed` = 0, `ltyp` = 0, `speed` = 0.0, `pexp` = false, `left` = false, `right` = false, `nl` = 0, `skip` = false, `bulkc` = 0, `ns` = 0, `smoke` = false, `tcnt` = 0, `gxz` = 0, `attack` = 0, `responce` = false, `trgxz` = 180, `trgt` = 0.
+   - `sms` array of 4 entries initialized to `-1`.
+   - `lstage` array of 20 entries initialized to `0`.
+
+2. **Distance Helpers (`getpy` and `getcpy`)**:
+   - `getpy(48000, -38000, 28000, 0)` = `166340000`
+   - `getpy(-28000, 18000, -8000, 1)` = `43490000`
+   - `getcpy(c1, c2)` = `1490000` with 3D coordinate inputs in tens of thousands verifying `Math.imul` and `i32()` wrapping.
+
+3. **`reset(int, int)`**:
+   - `reset(90, 2)`: `rspeed` = 90, `ltyp` = 2, `pexp` = false, all `lstage` entries reset to 0.
+   - `reset(45, 1)`: `rspeed` = 45, `ltyp` = 1, `pexp` = false, all `lstage` entries reset to 0.
+
+4. **`lasercolid(ContO)`**:
+   - Target bounding check verifying `lhit[0]` = 0, `lhit[1]` = 0, `targetConto.hit` = false, `targetConto.nhits` = 0.
+
+5. **Graphics Methods (`dl` and `dosmokes`)**:
+   - `dl(g)`: `lhit[0]` = 0, `lhit[1]` = 2, `lhit[2]` = 3, `lstage[2]` = 0 (transitions through hit stages).
+   - `dosmokes(g, conto)`: `ns` = 1, `smoke` = false, `sms[0]` = 1.
+
+6. **`preform(ContO, ContO[], int, int)` Multi-Step Simulation**:
+   - **Scenario A (5-step left steering)**:
+     - Steps 0–4 tracking `conto.x`, `conto.y`, `conto.z`, `conto.xz`, `conto.xy`, `conto.zy`, `conto.fire`, `conto.hit`, `conto.nhits`, `conto.exp`.
+     - Steps 0–4 tracking `tank.rspeed`, `tank.speed`, `tank.ltyp`, `tank.pexp`, `tank.left`, `tank.right`, `tank.nl`, `tank.skip`, `tank.bulkc`, `tank.ns`, `tank.smoke`, `tank.tcnt`, `tank.gxz`, `tank.attack`, `tank.responce`, `tank.trgxz`, `tank.trgt`.
+   - **Scenario B (5-step right steering)**:
+     - Steps 0–4 verifying full state transitions continuing from Scenario A.
+   - **Scenario C (Boundary clamping)**:
+     - `playerConto.x` = 40000, `playerConto.z` = -39964.
+   - **Scenario D (Pitch/Roll normalisation)**:
+     - `playerConto.zy` = 302, `playerConto.xy` = 119, `tank.smoke` = true.
+   - **Scenario E (Gravity response)**:
+     - `grav.y1` = 256, `grav.y2` = 269, `grav.y3` = 271.
+   - **Scenario F (Laser firing)**:
+     - `nl` = 1, `lstage[0]` = 2, `lspeed[0]` = 190, `lx[0]` = 40000, `ly[0]` = 337, `lz[0]` = -39733, `lzy[0]` = 320.
+   - **Scenario G (Laser homing)**:
+     - `lxz[0]` = 0, `lzy[0]` = 320, `nf[0]` = 2, `lx[0]` = 40000, `ly[0]` = 337, `lz[0]` = -39733.
+   - **Scenario H (Response tracking)**:
+     - `u.right` = true, `trgxz` = 70.
+
+---
+
+## 2. What Was Excluded and Why (Spec §2d)
+
+The following fields depend on Java's unseeded `Math.random()` and cannot produce stable expected values:
+
+1. **`turnat` in constructor** (`Tank.java:452`):
+   - `this.turnat = (int)(Math.random() * 50.0);`
+   - Excluded because unseeded Java `Math.random()` produces variable initial values across JVM runs (`nondet.init_turnat = 1000` in probe was an explicit override).
+2. **`sx[ns]` in `dosmokes()`** (`Tank.java:382`):
+   - `this.sx[this.ns] = conto.x + (int)(Math.random() * 150.0 - 75.0);`
+   - Excluded because particle offset is randomized on each smoke spawn (`nondet.smoke_sx0`).
+3. **Explosion and random AI target rolls**:
+   - `conto.exp` explosion angle/position deltas (`Tank.java:130-133`) and random targeting updates in `preform()` (`Tank.java:278, 281, 289, 295, 326, 445`).
+   - The probe explicitly kept `turnat = 1000` (`tcnt <= turnat`) and `conto.exp = false` during the simulation to isolate deterministic logic.
+
+---
+
+## 3. §2 Compound Assignment Audit
+
+Grep for `+= (int)(` and `-= (int)(` in `Tank.java`: 11 sites found.
+
+| Sites | Java Source Line | Bytecode / Semantics | Classification | Confidence | Discriminating Input Shape |
+|---|---|---|---|---|---|
+| **1–2** | `conto.xy += (int)(this.speed / 5.0f);`<br>`conto.xy -= (int)(this.speed / 5.0f);` | `getfield ContO.xy; i2f; getfield speed; ldc 5.0f; fdiv; fadd; f2i; putfield` (LHS widened, single end truncation) | **Case A** | HIGH | `speed` positive, `conto.xy` small non-zero fractional step |
+| **3–5** | `lx[n2] -= (int)(this.lspeed[j2] * (...));`<br>`lz[n3] += (int)(this.lspeed[j2] * (...));`<br>`ly[n4] -= (int)(this.lspeed[j2] * (...));` | RHS float32 trig/speed product truncated before int32 subtraction/addition | **Case B** | HIGH | Coordinate positive, RHS delta negative fraction |
+| **6–8** | `conto.x -= (int)(this.speed * (...));`<br>`conto.z += (int)(this.speed * (...));`<br>`conto.y -= (int)(this.speed * (...));` | RHS velocity float32 component truncated before integer subtraction/addition | **Case B** | HIGH | Coordinate positive, RHS delta negative fraction |
+| **9–11** | `this.gxz += (int)(70.0 + Math.random() * 20.0);`<br>`this.gxz -= (int)(70.0 + Math.random() * 20.0);`<br>`this.gxz += (int)(Math.random() * 40.0 - 20.0);` | `d2i` before integer add/sub | **Case B** | HIGH | Angle positive, delta negative fraction |
+
+---
+
+## 4. Unexplained Values & Changes to Tank.js
+
+- **Unexplained values**: None. All values in [`Tank.probe.txt`](file:///home/evan/resources/ra1/decompilation/logs/Tank.probe.txt) align with the transpilation semantics.
+- **Changes made to [`Tank.js`](file:///home/evan/resources/ra1/port/Tank.js)**: None required. [`Tank.js`](file:///home/evan/resources/ra1/port/Tank.js) was already transpiled with strict adherence to `TRANSPILE_SPEC.md` (`Int32Array`, `Math.imul`, `i32()`, `fr()`, `trunc()`, and §2 Case A / Case B handling).
+- **Other files modified**: None.

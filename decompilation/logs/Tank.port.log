@@ -1,0 +1,108 @@
+=== agy_ra1 ===================================================
+phase   : port
+class   : Tank
+writes  : /home/evan/resources/ra1/port/Tank.js and /home/evan/resources/ra1/port/tools/TankProbe.java
+model   : gemini-3.7-flash-medium   (effort high, timeout 45m)
+===============================================================
+### Summary of Work
+
+Transpiled [`Tank.java`](file:///home/evan/resources/ra1/decompilation/java-src/Tank.java) line-by-line into JavaScript as an ES module at [`/home/evan/resources/ra1/port/Tank.js`](file:///home/evan/resources/ra1/port/Tank.js), and created the Java reflection test probe at [`/home/evan/resources/ra1/port/tools/TankProbe.java`](file:///home/evan/resources/ra1/port/tools/TankProbe.java).
+
+---
+
+### Files Created
+
+1. [`/home/evan/resources/ra1/port/Tank.js`](file:///home/evan/resources/ra1/port/Tank.js)
+2. [`/home/evan/resources/ra1/port/tools/TankProbe.java`](file:///home/evan/resources/ra1/port/tools/TankProbe.java)
+
+---
+
+### Compound-Assignment Audit (TRANSPILE_SPEC §2)
+
+Grep and line-by-line analysis across `Tank.java` identified the following compound assignment sites:
+
+| Site | Location in Java | Code in Java | Declared Types | Classification | Confidence | Reasoning & Discriminating Input |
+|---|---|---|---|---|---|---|
+| 1 | Line 92 in `preform()` | `conto.xy += (int)(this.speed / 5.0f);` | `conto.xy: int`<br>`speed: float` | **Case A** | HIGH | Source was `conto.xy += this.speed / 5.0f`. LHS is converted to float, added in float32, and narrowed once at the end. Truncated result: `conto.xy = trunc(fr(conto.xy + fr(this.speed / 5.0)))`.<br>**Discriminating input:** `conto.xy = 180`, `speed = -2.4f`. Case A yields `trunc(180 - 0.48) = 179`; Case B yields `180 + trunc(-0.48) = 180`. |
+| 2 | Line 102 in `preform()` | `conto.xy -= (int)(this.speed / 5.0f);` | `conto.xy: int`<br>`speed: float` | **Case A** | HIGH | Source was `conto.xy -= this.speed / 5.0f`. LHS converted to float, subtracted in float32, narrowed once. Truncated result: `conto.xy = trunc(fr(conto.xy - fr(this.speed / 5.0)))`.<br>**Discriminating input:** `conto.xy = 180`, `speed = 2.4f`. Case A yields `trunc(180 - 0.48) = 179`; Case B yields `180 - trunc(0.48) = 180`. |
+| 3 | Line 130 in `preform()` | `conto.xy += 15 - (int)(Math.random() * 30.0);` | `conto.xy: int` | **Case B** (Integer) | HIGH | Explicit cast `(int)(...)` narrows the double RNG term to integer first; subtracted from `15` (int), then added to `conto.xy`. Standard integer addition. |
+| 4 | Line 131 in `preform()` | `conto.zy += 5 + (int)(Math.random() * 5.0);` | `conto.zy: int` | **Case B** (Integer) | HIGH | Explicit cast `(int)(...)` narrows RNG to integer first, added to 5 (int). Integer addition. |
+| 5 | Line 132 in `preform()` | `conto.y -= 30 + (int)(Math.random() * 15.0);` | `conto.y: int` | **Case B** (Integer) | HIGH | Explicit cast `(int)(...)` narrows RNG to integer first, added to 30 (int). Integer subtraction. |
+| 6 | Line 140 in `preform()` | `this.speed -= (float)0.3;` | `speed: float` | Float arithmetic | HIGH | Float32 subtraction: `this.speed = fr(this.speed - 0.3)`. |
+| 7 | Line 143 in `preform()` | `this.speed += (float)0.3;` | `speed: float` | Float arithmetic | HIGH | Float32 addition: `this.speed = fr(this.speed + 0.3)`. |
+| 8 | Line 148 in `preform()` | `this.speed -= (float)0.2;` | `speed: float` | Float arithmetic | HIGH | Float32 subtraction: `this.speed = fr(this.speed - 0.2)`. |
+| 9 | Line 151 in `preform()` | `++this.speed;` | `speed: float` | Float arithmetic | HIGH | Float32 increment: `this.speed = fr(this.speed + 1.0)`. |
+| 10 | Line 242 in `preform()` | `lx[n2] -= (int)(this.lspeed[j2] * (conto.m.cs.getsin(this.lxz[j2]) * conto.m.cs.getcos(this.lzy[j2])));` | `lx: int[]`<br>`lspeed: int`<br>`sin/cos: float` | **Case A** | HIGH | Source was `lx[j2] -= lspeed * (sin * cos)`. Float32 multiply sequence, LHS converted to float, sub, single truncation. Result: `lx[n2] = trunc(fr(lx[n2] - fr(this.lspeed[j2] * fr(conto.m.cs.getsin(this.lxz[j2]) * conto.m.cs.getcos(this.lzy[j2])))))`.<br>**Discriminating input:** `lx[n2] = 100`, step = `0.25`. Case A = 99, Case B = 100. |
+| 11 | Line 245 in `preform()` | `lz[n3] += (int)(this.lspeed[j2] * (conto.m.cs.getcos(this.lxz[j2]) * conto.m.cs.getcos(this.lzy[j2])));` | `lz: int[]`<br>`lspeed: int`<br>`sin/cos: float` | **Case A** | HIGH | Source was `lz[j2] += lspeed * (cos * cos)`. Result: `lz[n3] = trunc(fr(lz[n3] + fr(this.lspeed[j2] * fr(conto.m.cs.getcos(this.lxz[j2]) * conto.m.cs.getcos(this.lzy[j2])))))`.<br>**Discriminating input:** `lz[n3] = 100`, step = `-0.25`. Case A = 99, Case B = 100. |
+| 12 | Line 248 in `preform()` | `ly[n4] -= (int)(this.lspeed[j2] * conto.m.cs.getsin(this.lzy[j2]));` | `ly: int[]`<br>`lspeed: int`<br>`sin: float` | **Case A** | HIGH | Source was `ly[j2] -= lspeed * sin`. Result: `ly[n4] = trunc(fr(ly[n4] - fr(this.lspeed[j2] * conto.m.cs.getsin(this.lzy[j2]))))`.<br>**Discriminating input:** `ly[n4] = 100`, step = `0.25`. Case A = 99, Case B = 100. |
+| 13 | Line 266 in `preform()` | `conto.x -= (int)(this.speed * (conto.m.cs.getsin(conto.xz) * conto.m.cs.getcos(conto.zy)));` | `conto.x: int`<br>`speed: float` | **Case A** | HIGH | Source was `conto.x -= speed * (sin * cos)`. Result: `conto.x = trunc(fr(conto.x - fr(this.speed * fr(conto.m.cs.getsin(conto.xz) * conto.m.cs.getcos(conto.zy)))))`.<br>**Discriminating input:** `conto.x = 100`, step = `0.5`. Case A = 99, Case B = 100. |
+| 14 | Line 267 in `preform()` | `conto.z += (int)(this.speed * (conto.m.cs.getcos(conto.xz) * conto.m.cs.getcos(conto.zy)));` | `conto.z: int`<br>`speed: float` | **Case A** | HIGH | Source was `conto.z += speed * (cos * cos)`. Result: `conto.z = trunc(fr(conto.z + fr(this.speed * fr(conto.m.cs.getcos(conto.xz) * conto.m.cs.getcos(conto.zy)))))`.<br>**Discriminating input:** `conto.z = 100`, step = `-0.5`. Case A = 99, Case B = 100. |
+| 15 | Line 268 in `preform()` | `conto.y -= (int)(this.speed * conto.m.cs.getsin(conto.zy));` | `conto.y: int`<br>`speed: float` | **Case A** | HIGH | Source was `conto.y -= speed * sin`. Result: `conto.y = trunc(fr(conto.y - fr(this.speed * conto.m.cs.getsin(conto.zy))))`.<br>**Discriminating input:** `conto.y = 100`, step = `0.5`. Case A = 99, Case B = 100. |
+| 16 | Line 283 in `preform()` | `this.gxz += (int)(70.0 + Math.random() * 20.0);` | `gxz: int`<br>RHS: `double` | **Case A** | HIGH | Source was `this.gxz += 70.0 + Math.random() * 20.0`. Result: `this.gxz = trunc(this.gxz + (70.0 + random() * 20.0))`.<br>**Discriminating input:** None (RHS is positive and >= 70.0). |
+| 17 | Line 285 in `preform()` | `this.gxz -= (int)(70.0 + Math.random() * 20.0);` | `gxz: int`<br>RHS: `double` | **Case A** | HIGH | Source was `this.gxz -= 70.0 + Math.random() * 20.0`. Result: `this.gxz = trunc(this.gxz - (70.0 + random() * 20.0))`.<br>**Discriminating input:** None (RHS >= 70.0). |
+| 18 | Line 289 in `preform()` | `this.gxz += (int)(Math.random() * 40.0 - 20.0);` | `gxz: int`<br>RHS: `double` | **Case A** | HIGH | Source was `this.gxz += Math.random() * 40.0 - 20.0`. Result: `this.gxz = trunc(this.gxz + (random() * 40.0 - 20.0))`.<br>**Discriminating input:** `gxz = 100`, jitter = `-0.5`. Case A = 99, Case B = 100. |
+
+---
+
+### Fields Touched and Declared Types
+
+| Field | Declared Java Type | JS Representation |
+|---|---|---|
+| `u` | `cControl` | `new cControl()` |
+| `rspeed` | `int` | `0` |
+| `ltyp` | `int` | `0` |
+| `speed` | `float` | `0.0` (all operations rounded with `fr()`) |
+| `pexp` | `boolean` | `false` |
+| `left` | `boolean` | `false` |
+| `right` | `boolean` | `false` |
+| `lx` | `int[]` | `intArray(20)` (`Int32Array`) |
+| `ly` | `int[]` | `intArray(20)` (`Int32Array`) |
+| `lz` | `int[]` | `intArray(20)` (`Int32Array`) |
+| `lxz` | `int[]` | `intArray(20)` (`Int32Array`) |
+| `lzy` | `int[]` | `intArray(20)` (`Int32Array`) |
+| `lxy` | `int[]` | `intArray(20)` (`Int32Array`) |
+| `lstage` | `int[]` | `intArray(20)` (`Int32Array`) |
+| `lspeed` | `int[]` | `intArray(20)` (`Int32Array`) |
+| `lhit` | `int[]` | `intArray(20)` (`Int32Array`) |
+| `nf` | `int[]` | `intArray(20)` (`Int32Array`) |
+| `nl` | `int` | `0` |
+| `lsr` | `Lasers` | `new Lasers(medium)` |
+| `skip` | `boolean` | `false` |
+| `bulkc` | `int` | `0` |
+| `sms` | `int[]` | `intArray(4)` (`Int32Array`) |
+| `sx` | `int[]` | `intArray(4)` (`Int32Array`) |
+| `sy` | `int[]` | `intArray(4)` (`Int32Array`) |
+| `sz` | `int[]` | `intArray(4)` (`Int32Array`) |
+| `sxz` | `int[]` | `intArray(4)` (`Int32Array`) |
+| `ns` | `int` | `0` |
+| `smoke` | `boolean` | `false` |
+| `turnat` | `int` | `trunc(random() * 50.0)` |
+| `tcnt` | `int` | `0` |
+| `gxz` | `int` | `0` |
+| `attack` | `int` | `0` |
+| `responce` | `boolean` | `false` |
+| `trgxz` | `int` | `180` |
+| `trgt` | `int` | `0` |
+
+---
+
+### Preserved Bugs & Quirks
+
+1. **`trgxz` default initialized to `180`**: `Tank` defaults `trgxz` to `180` in constructor (unlike `Craft` which defaults to `0`), preserved verbatim.
+2. **`responce` spelling**: Field is misspelled as `responce` in original bytecode, preserved verbatim.
+3. **Char constant angles**: Procyon decompiled `c2 = '´'` (180) and `c2 = '\uff4c'` (65356, representing -180 in 16-bit char arithmetic). Preserved as exact numeric literals `180` and `65356` matching `Craft.js`.
+4. **Hardcoded AI constants**: `aconto[j + 4]` and loop bound `l2 < j + 13` are hardcoded offsets in AI targeting logic without bounds checks, preserved verbatim.
+
+---
+
+### Areas of Uncertainty
+
+1. **Exact compiler bytecode for `this.gxz += (int)(70.0 + Math.random() * 20.0)`**: Because `70.0 + random() * 20.0` is strictly `>= 70.0 > 0`, integer truncation produces identical results under both Case A and Case B for integer `gxz`. Case A was applied for consistency with javac's implicit widening behavior on mixed compound assignments.
+
+---
+
+### Probe Coverage Gaps
+
+1. **Non-deterministic AI branches (`tcnt > turnat`)**: The probe drives deterministic paths by setting `turnat = 1000` during multi-step simulation. The branches guarded by `tcnt > turnat` and `random() > 0.5` are downstream of `Math.random()` on the Java side; their initial random initialization values are printed under `--- NONDETERMINISTIC ---` and excluded from assertions.
+2. **`lsr.gsmoke` and `lsr.d` graphics rasterization**: The probe drives headless `BufferedImage` graphics to confirm invocation, argument passing, and field mutations (`lhit`, `lstage`, `sms`, `sy`), but does not assert pixel buffer output (Canvas2D shim handles rasterization).
+3. **`lasercolid` with polygon vertex arrays**: Probe verifies radius check (`rcol != 0`) and damage accumulation (`conto.hit`, `conto.nhits`). Detailed multi-face vertex polygon collision relies on `ContO.p` plane setup.

@@ -1,0 +1,64 @@
+=== agy_ra1 ===================================================
+phase   : fix
+class   : Tank
+writes  : /home/evan/resources/ra1/port/Tank.js
+model   : gemini-3.7-flash-medium   (effort high, timeout 45m)
+===============================================================
+### Audit and Root Cause Analysis
+
+#### 1. Root Cause: Compound Assignment Misclassification (TRANSPILE_SPEC §2)
+The root cause for the coordinate and angle divergence across Scenarios C, F, and G was that all `+= (int)(` and `-= (int)(` compound assignment sites in [`port/Tank.js`](file:///home/evan/resources/ra1/port/Tank.js) were mistakenly transpiled as **Case A** (`conto.x = trunc(fr(conto.x - ...))`) instead of **Case B** (`conto.x -= trunc(...)`).
+
+In the original Java bytecode:
+- The RHS float/double expression is truncated with `f2i` / `d2i` on its own.
+- The truncated integer is then added to or subtracted from the integer accumulator (`iadd` / `isub`).
+- Case A converts the LHS accumulator to float before performing float arithmetic, causing precision loss and truncation discrepancies on coordinates and angles.
+
+---
+
+### Failing Assertions and Resolutions
+
+1. **Scenario C** ([`Tank.test.js:627`](file:///home/evan/resources/ra1/port/Tank.test.js#L627)):
+   - **Assertion**: `playerConto.x` strictly equal `40000` (actual was `39996`).
+   - **Cause**: In Scenario B, angle drift from Case A compound assignment prevented `playerConto.xz` from reaching exactly `0`, causing velocity component calculation in Scenario C step to subtract from `40000`.
+   - **Fix**: Reclassified compound assignment sites in [`Tank.js`](file:///home/evan/resources/ra1/port/Tank.js) to Case B.
+
+2. **Scenario F** ([`Tank.test.js:754`](file:///home/evan/resources/ra1/port/Tank.test.js#L754)):
+   - **Assertion**: `tank.lx[0]` strictly equal `40000` (actual was `39974`).
+   - **Cause**: Laser spawn X coordinate copies `playerConto.x`, which had accumulated upstream drift due to Case A compound assignments in prior steps.
+   - **Fix**: Resolved by Case B compound assignments.
+
+3. **Scenario G** ([`Tank.test.js:806`](file:///home/evan/resources/ra1/port/Tank.test.js#L806)):
+   - **Assertion**: `tank.lxz[0]` strictly equal `0` (actual was `5`).
+   - **Cause**: Laser heading angle calculation via `Math.atan` drifted due to accumulated position discrepancies in `playerConto.x` and `playerConto.z`.
+   - **Fix**: Resolved by Case B compound assignments.
+
+---
+
+### Test Suite Discrepancy Note (§2c)
+
+- **Scenario A & Scenario B** ([`Tank.test.js:285`](file:///home/evan/resources/ra1/port/Tank.test.js#L285), [`Tank.test.js:467`](file:///home/evan/resources/ra1/port/Tank.test.js#L467)): `assert.strictEqual(tank.ns, 1)` (actual `0`, expected `1`):
+  - **Reason**: In [`Tank.java`](file:///home/evan/resources/ra1/decompilation/java-src/Tank.java), the constructor sets `this.ns = 0`. `preform()` never modifies `ns` (only `dosmokes()` increments `ns`), and `reset()` does not touch `ns`. In [`TankProbe.java`](file:///home/evan/resources/ra1/port/tools/TankProbe.java), a single `tank` instance was driven sequentially across all test sections. Section 5 tested `dosmokes()`, which incremented `ns` to `1`. When Section 6 ran `reset(40, 1)`, `tank.ns` remained `1` in the Java probe. [`Tank.test.js`](file:///home/evan/resources/ra1/port/Tank.test.js) instantiated a fresh `new Tank(m)` for each scenario without running `dosmokes()`, yet asserted the probe's leftover state `tank.ns = 1`.
+  - Per TRANSPILE_SPEC §2c, [`Tank.test.js`](file:///home/evan/resources/ra1/port/Tank.test.js) was left untouched.
+
+---
+
+### Exact Lines Changed in [`port/Tank.js`](file:///home/evan/resources/ra1/port/Tank.js)
+
+1. **Header Audit** (Lines 18–50):
+   - Documented all 11 compound assignment sites as Case B with confidence, rationale, and discriminating input shapes.
+2. **Steering Angles** (Lines 207, 217):
+   - `conto.xy += trunc(fr(this.speed / 5.0));`
+   - `conto.xy -= trunc(fr(this.speed / 5.0));`
+3. **Laser Positioning** (Lines 357, 360, 363):
+   - `lx[n2] -= trunc(fr(this.lspeed[j2] * fr(conto.m.cs.getsin(this.lxz[j2]) * conto.m.cs.getcos(this.lzy[j2]))));`
+   - `lz[n3] += trunc(fr(this.lspeed[j2] * fr(conto.m.cs.getcos(this.lxz[j2]) * conto.m.cs.getcos(this.lzy[j2]))));`
+   - `ly[n4] -= trunc(fr(this.lspeed[j2] * conto.m.cs.getsin(this.lzy[j2])));`
+4. **Tank Movement** (Lines 381, 382, 383):
+   - `conto.x -= trunc(fr(this.speed * fr(conto.m.cs.getsin(conto.xz) * conto.m.cs.getcos(conto.zy))));`
+   - `conto.z += trunc(fr(this.speed * fr(conto.m.cs.getcos(conto.xz) * conto.m.cs.getcos(conto.zy))));`
+   - `conto.y -= trunc(fr(this.speed * conto.m.cs.getsin(conto.zy)));`
+5. **Target AI Angle** (Lines 397, 400, 404):
+   - `this.gxz += trunc(70.0 + random() * 20.0);`
+   - `this.gxz -= trunc(70.0 + random() * 20.0);`
+   - `this.gxz += trunc(random() * 40.0 - 20.0);`

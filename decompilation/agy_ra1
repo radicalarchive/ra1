@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+#
+# agy_ra1 — run ONE bounded transpilation step via `agy -p`.
+#
+# Usage:   bash decompilation/agy_ra1 class <Class>    the whole loop, in one job
+#          bash decompilation/agy_ra1 port  <Class>    write port/<Class>.js + the probe
+#          bash decompilation/agy_ra1 test  <Class>    write port/<Class>.test.js from probe output
+#          bash decompilation/agy_ra1 fix   <Class>    fix the code against a failing test log
+#
+# (Invoke with `bash`: chmod is not available in this session, so the file is
+# not marked executable.)
+#
+# ---------------------------------------------------------------------------
+# THE SUBAGENT HAS A SHELL. It runs under --dangerously-skip-permissions (the
+# user's explicit decision), so it can do the whole loop itself:
+#
+#   javap -p -c   classify every §2 compound assignment from the BYTECODE
+#   javac / java  compile and run its own reflection probe against the jar
+#   node --test   run the tests it wrote, and iterate until they are green
+#
+# That is what `class` does. The three narrow phases remain for when you want
+# to intervene between steps.
+#
+# What this does NOT change: the caller still verifies. A job reports its own
+# work, and a job that marks itself done is evidence of nothing — earlier runs
+# classified 13 of 14 sites backwards at HIGH confidence, wrote probes whose
+# printed values no test could reach, and inlined stub copies of a class that
+# already had a file. Read the diff, re-check `javap`, and run the mutation
+# test yourself. See run_class's closing checklist.
+# ---------------------------------------------------------------------------
+
+set -euo pipefail
+
+# Delegation runs on Gemini 3.7 Medium. The claude-* models are OFF LIMITS here
+# — the user's instruction, and the reason the earlier classes stalled on a
+# shared quota. Effort is fixed by the model name, so --effort is dropped below.
+# Keep concurrency to two.
+MODEL="${MODEL:-gemini-3.7-flash-medium}"
+EFFORT="${EFFORT:-high}"
+TIMEOUT="${TIMEOUT:-45m}"
+
+REPO="/home/evan/resources/ra1"
+NFM="/home/evan/resources/nfm"
+SRC_DIR="$REPO/decompilation/java-src"
+OUT_DIR="$REPO/port"
+LOGS="$REPO/decompilation/logs"
+JAR_DIR="/tmp/ra1jar"
+
+[ $# -ge 2 ] || { echo "usage: $0 <port|test|fix> <Class>" >&2; exit 2; }
+PHASE="$1"
+CLASS="$2"
+[ -f "$SRC_DIR/$CLASS.java" ] || { echo "no such source: java-src/$CLASS.java" >&2; exit 2; }
+
+SPEC_HEADER="You are transpiling Java to JavaScript for a browser port of the 2001 game \"Radical Aces\". Work in $REPO.
+
+YOU HAVE A SHELL, and you are expected to use it. Compile and run your own probe, disassemble with javap, and run the tests. Do not report a step as done without having run it. Stay inside $REPO, $NFM and /tmp; do not install anything, do not touch the network, and do not modify the game assets, ra1.jar, or any file this job is not told to write.
+
+The decompiled Java in $SRC_DIR is the source of truth. The unpacked jar is at $JAR_DIR; the BYTECODE is the arbiter for anything the Java is ambiguous about:
+  javap -p -c -cp $JAR_DIR <Class>          # whole class
+  javap -p -c -cp $JAR_DIR <Class> | less   # find the method, read the offsets
+
+Read $OUT_DIR/TRANSPILE_SPEC.md IN FULL before writing a line. It is the contract, not a suggestion. The rules that most often cause SILENT failure:
+  §0 transpile LINE BY LINE; keep procyon's local variable names; do not restructure, rename, simplify, or fix apparent bugs.
+  §1 numeric semantics: idiv / trunc / fr / i32 / Math.imul. SinCos.getsin and SinCos.getcos return FLOAT, so every expression touching them is float32 in Java and needs fr() at EACH binary operation. Math.sqrt/atan and double literals make an expression double instead — read the declared types.
+  §2 procyon decompiles compound assignment WRONG. Grep the Java for '+= (int)(' and '-= (int)(' BEFORE writing code and classify every hit from the BYTECODE — never from the shape of the Java, and never from intuition. Run javap, find the site, and read it:
+        Case A  getfield <lhs> ; i2f/i2d ; <rhs> ; fadd/dadd ; f2i/d2i ; putfield   (accumulator widened, ONE truncation at the end)
+        Case B  getfield <lhs> ; <rhs> ; f2i/d2i ; iadd/isub  ; putfield            (rhs truncated first, integer add)
+      The tell is whether an i2f/i2d sits between the getfield of the accumulator and the arithmetic. QUOTE the offsets and the opcode sequence for every site in your report. This is the single most-failed rule in this port: one job classified 13 of 14 sites Case A at HIGH confidence when every one was Case B, and a second classified the same shape the other way round. Your confidence is not evidence; the disassembly is.
+  §2b EVERY int operation wraps at 32 bits, the ADDITION as well as the multiply. Wrap the whole expression with i32(). Use Math.imul ONLY when BOTH operands are declared int — on a float operand it silently zeroes the value, and in the sibling port that one mistake meant no car ever collided.
+
+TWO RULES ADDED AFTER THE CALIBRATION CLASS. Both are things the Plane job got wrong; violating either fails review:
+  (a) EVERY Java int[] becomes intArray(n) (Int32Array) and every float[] becomes floatArray(n) — fields AND locals, including the little \`final int[] ai = new int[this.n]\` scratch arrays inside a method. \`new Array(n).fill(0)\` is NOT a transpilation of int[]: it silently loses the wrap-and-truncate that Java does on every store, which is exactly the divergence §2b is about. Do not reason that the values 'are already in range'.
+  (b) An int multiply inside a LARGER expression still wraps. \`(j - fp) * (cx - i) / j + i\` is \`imul; idiv; iadd\` in the bytecode, so it is \`i32(idiv(Math.imul(j - fp, cx - i), j) + i)\` — not a plain JS \`*\`. Screen-projection helpers like xs/ys look small and safe and are the ones that overflow, because the depth term runs to 50000 and world coordinates to tens of thousands.
+  §2e a differential test proves nothing until you have seen it fail. For EVERY §2 site: work out the input shape that separates Case A from Case B, make sure the probe drives it, then MUTATE the site to the other case, re-run node --test, and confirm it goes RED before reverting. Report the mutation result per site. If no reachable input separates the two rules (a guard may make them coincide), say so explicitly and explain why — that is a legitimate answer, silence is not. Measured: Medium's tests passed with all nine of its sites flipped, and Tank's Case A site was covered by nothing until a case with the accumulator at 180 and a fractional step was added.
+  §2c NEVER weaken a test to make it pass.
+  §3 preserve the game's own bugs verbatim, including (int) casts of float literals.
+  §4 PAINTER'S ALGORITHM. There is no depth buffer. Submission order IS the depth. Never reorder, batch, or hoist a draw call.
+  §5a Java throws where JS shrugs — charAt past the end, Integer.valueOf of garbage. Match the throw with charAt()/parseIntJava() from java.js; do NOT add a bounds check the Java does not have.
+  §5c ARRAY INDEXING THROWS IN JAVA. Where a loop bound and an array length come from different places, read through at(arr, i) from java.js so it throws as the JVM does. Measured: a 2-vertex face in graphics/bebs.rad makes Plane's constructor throw, ContO's parser catches it and abandons the file, and the real model has 6 faces instead of 8. Plain indexing built the extra two out of NaN and every test still passed.
+
+Infrastructure you build on — read it, do NOT edit it:
+  $OUT_DIR/java.js       the helper library you MUST use
+  $OUT_DIR/graphics.js   the java.awt.Graphics shim (read its banner)
+Classes already ported live in $OUT_DIR (SinCos, Plane, ContO, Medium, Control, cControl, Craft, Tank …). IMPORT them. Do NOT write your own copy or stub of a class that has a file there, and do not edit those files. Measured: two jobs each inlined their own partial copy of Lasers instead of importing it. If a collaborator you need is genuinely not ported yet, say so in your report rather than inventing one.
+This game is the same engine family as \"Need for Madness\", already ported and verified at $NFM. Its ContO/Plane/Medium are the same author's code and are the style reference for what a good transpilation of this engine looks like — but it is a DIFFERENT GAME with different constants and different method bodies, so never copy logic across:
+  $NFM/web/Plane.js , $NFM/web/Plane.test.js , $NFM/web/ContO.js"
+
+PROBE_RECIPE="A Java reflection probe that drives the REAL class from the jar and prints its state:
+      javac -cp $JAR_DIR -d /tmp/ra1port/probe $OUT_DIR/tools/${CLASS}Probe.java
+      java -Djava.awt.headless=true -cp /tmp/ra1port/probe:$JAR_DIR tools.${CLASS}Probe
+    - declare 'package tools;'
+    - fields are package-private: getDeclaredField / getDeclaredMethod + setAccessible(true)
+    - print ONE value per line as 'label = value' (arrays as 'label = [a, b, c]'), so the values can go into a test as literals.
+    - PROBE THE METHOD THAT DOES THE WORK, not just the leaf helpers. If it needs collaborators, build them by reflection. Methods taking a java.awt.Graphics can be driven with new BufferedImage(500,360,BufferedImage.TYPE_INT_RGB).createGraphics() (the probe runs headless) — you are verifying the numbers computed and the fields mutated, not the pixels.
+    - EACH SECTION STARTS FROM A FRESH INSTANCE. A probe that drives section 6 on the object sections 1-5 already mutated prints values no test can reproduce, because the test constructs a new object; measured on both Craft and Tank. If a scenario deliberately continues from an earlier one, print the setup it depends on so the test can replay it exactly.
+    - choose inputs with NEGATIVE values and magnitudes large enough to overflow int32. Small all-positive inputs agree happily while the code is wrong.
+    - include the §2e discriminating inputs (above) for every compound-assignment site.
+    - anything downstream of Math.random() is non-deterministic ON THE JAVA SIDE (spec §2d). Print those values in a clearly-labelled section marked NONDETERMINISTIC so they are never asserted, and prefer inputs that avoid the random paths for everything else. Run the probe TWICE and diff the two runs: any line that differs is non-deterministic whether or not you expected it to be.
+    - print a final line 'PROBE OK' so a truncated run is obvious."
+
+case "$PHASE" in
+
+class)
+  OUTS="$OUT_DIR/$CLASS.js, $OUT_DIR/tools/${CLASS}Probe.java and $OUT_DIR/$CLASS.test.js"
+  read -r -d '' PROMPT <<PROMPT_EOF || true
+$SPEC_HEADER
+
+YOUR JOB — take $CLASS the whole way, and RUN everything you write. Three files:
+
+(1) $OUT_DIR/$CLASS.js — a line-by-line transpilation of $SRC_DIR/$CLASS.java, an ES module.
+
+(2) $OUT_DIR/tools/${CLASS}Probe.java — $PROBE_RECIPE
+
+(3) $OUT_DIR/$CLASS.test.js — a node:test file that drives $OUT_DIR/$CLASS.js exactly as the probe drives the Java, asserting the LITERAL numbers the probe printed, with a comment on each block naming the probe lines they came from. Run it with:
+      cd $OUT_DIR && node --test $CLASS.test.js
+    Use strictEqual on integers. Assert nothing the probe marked NONDETERMINISTIC.
+
+THE ORDER MATTERS: javap first, then the transpilation, then the probe, then the test. Save the probe output to $LOGS/$CLASS.probe.txt.
+
+WHEN A TEST FAILS, THE TEST IS RIGHT AND YOUR CODE IS WRONG (§2c) — the expected values came from the real Java. Find the actual semantic divergence: a missing fr() at an inner binary operation, a missing i32() around a wrapping add, an idiv that should be a plain divide, a §2 site classified the wrong way, Math.imul on a float operand, a (int) cast in the wrong place. You may NOT loosen an assertion, change the test's inputs, delete a case, or move an expected value into a comment. The ONE legitimate edit to a test is making its SETUP replay what the probe actually did, when the two differ — say so loudly in your report when you do it.
+If the probe itself turns out to be wrong (it drove Java differently than you intended), fix the probe, RE-RUN it, and regenerate the expectations from the new output. Never hand-adjust an expected value.
+
+Then MUTATION-TEST every §2 site: flip it to the other case, re-run node --test, confirm RED, revert. Report the result for each.
+
+Do not edit java.js, graphics.js, any other class's .js, TRANSPILE_SPEC.md, TASKS.md, WORK.md, or AGENTS.md.
+
+FINALLY report: the three files; EVERY compound-assignment site with its classification AND the javap offsets/opcodes you read it from AND its mutation result; the final 'node --test' pass/fail counts, pasted; every field you touched with its declared Java type; every preserved bug; every place you were unsure what Java does; and what your probe does NOT cover. Be explicit about gaps — a gap you flag is cheap, a gap you paper over costs days. Do not report "gaps: none"; a job in the sibling port did that while having silently stubbed a method to return its own failure code.
+PROMPT_EOF
+  ;;
+
+port)
+  OUTS="$OUT_DIR/$CLASS.js and $OUT_DIR/tools/${CLASS}Probe.java"
+  read -r -d '' PROMPT <<PROMPT_EOF || true
+$SPEC_HEADER
+
+YOUR JOB — two files, nothing else:
+
+(1) $OUT_DIR/$CLASS.js — a line-by-line transpilation of $SRC_DIR/$CLASS.java, an ES module.
+
+(2) $OUT_DIR/tools/${CLASS}Probe.java — $PROBE_RECIPE
+
+Compile and RUN the probe, saving its output to $LOGS/$CLASS.probe.txt. Write NOTHING else: no .test.js in this job — the caller writes it in the next phase.
+
+Do not edit java.js, graphics.js, any other class's .js, TRANSPILE_SPEC.md, TASKS.md, WORK.md, or AGENTS.md.
+
+FINALLY report: the two files; EVERY compound-assignment site with its classification AND the javap offsets/opcodes you read it from; every field you touched with its declared Java type; every preserved bug; every place you were unsure what Java does; and what your probe does NOT cover. Be explicit about gaps — a gap you flag is cheap, a gap you paper over costs days. Do not report "gaps: none"; a job in the sibling port did that while having silently stubbed a method to return its own failure code.
+PROMPT_EOF
+  ;;
+
+test)
+  PROBE_OUT="$LOGS/$CLASS.probe.txt"
+  [ -f "$PROBE_OUT" ] || { echo "no probe output at $PROBE_OUT — run the probe first" >&2; exit 2; }
+  OUTS="$OUT_DIR/$CLASS.test.js"
+  read -r -d '' PROMPT <<PROMPT_EOF || true
+$SPEC_HEADER
+
+The probe has ALREADY been compiled and run against the real Java class. Its output is at:
+  $PROBE_OUT
+
+YOUR JOB — one file: $OUT_DIR/$CLASS.test.js, a node:test file that drives $OUT_DIR/$CLASS.js the same way $OUT_DIR/tools/${CLASS}Probe.java drives the Java, and asserts the LITERAL numbers from that probe output, with a comment on each block saying they came from the probe.
+
+RUN IT: cd $OUT_DIR && node --test $CLASS.test.js — and iterate until it is green.
+
+Use strictEqual on integers. Do not assert anything the probe marked NONDETERMINISTIC — instead add a comment naming those fields and saying why they are excluded (spec §2d).
+
+Your test must SET UP the object the way the probe did. If the probe drove several scenarios on one instance, replay that history; do not construct a fresh object and assert values that depend on the earlier ones.
+
+If a value in the probe output disagrees with what you believe your JS produces, the probe is right and YOUR CODE IS WRONG (§2c). You may fix $OUT_DIR/$CLASS.js. You may NOT change the test's inputs, loosen an assertion, move an expected value into a comment, delete a case, or argue the failing range is unrealistic. If you cannot reconcile it, write the test asserting the PROBE's value anyway, mark it test.todo, and say so loudly in your report.
+
+Do not edit any other file.
+
+Then MUTATION-TEST every §2 site: flip it to the other case, re-run node --test, confirm RED, revert. A site no input can discriminate must be named as such, with the reason.
+
+FINALLY report: the final 'node --test' pass/fail counts pasted verbatim, what you asserted, what you excluded and why, the mutation result per §2 site, any value you could not explain, and any change you made to $CLASS.js and why.
+PROMPT_EOF
+  ;;
+
+fix)
+  FAIL_LOG="$LOGS/$CLASS.fail.txt"
+  [ -f "$FAIL_LOG" ] || { echo "no failure log at $FAIL_LOG" >&2; exit 2; }
+  OUTS="$OUT_DIR/$CLASS.js"
+  read -r -d '' PROMPT <<PROMPT_EOF || true
+$SPEC_HEADER
+
+The caller ran your test. It FAILED. The output is at:
+  $FAIL_LOG
+The expected values in that test came from the real Java class, so THE TEST IS RIGHT AND YOUR CODE IS WRONG. Also at hand: the probe output the expectations came from, $LOGS/$CLASS.probe.txt.
+
+YOUR JOB — fix $OUT_DIR/$CLASS.js so the assertions hold, by finding the actual semantic divergence: a missing fr() at an inner binary operation, a missing i32() around a wrapping add, an idiv that should be a plain divide (or the reverse), a §2 compound assignment classified the wrong way, Math.imul applied to a float operand, or a (int) cast in the wrong place.
+
+Check the bytecode before you change a §2 site: javap -p -c -cp $JAR_DIR $CLASS.
+
+You may NOT touch $OUT_DIR/$CLASS.test.js (§2c), and you may not edit any other file. If after real analysis you conclude the test itself is wrong, do not change it — say so in your report with your reasoning, and stop.
+
+Re-run 'cd $OUT_DIR && node --test' and paste the result.
+
+FINALLY report: each failing assertion, the root cause, the exact line you changed, and anything still unexplained.
+PROMPT_EOF
+  ;;
+
+*)
+  echo "unknown phase: $PHASE (want class|port|test|fix)" >&2; exit 2 ;;
+esac
+
+if [ -n "${EXTRA:-}" ]; then
+  PROMPT="$PROMPT
+
+$EXTRA"
+fi
+
+if [ -n "${PROMPT_FILE:-}" ]; then
+  printf '%s\n' "$PROMPT" > "$PROMPT_FILE"
+  echo "$PROMPT_FILE"
+  exit 0
+fi
+
+mkdir -p "$LOGS" "$OUT_DIR/tools"
+
+echo "=== agy_ra1 ==================================================="
+echo "phase   : $PHASE"
+echo "class   : $CLASS"
+echo "writes  : $OUTS"
+echo "model   : $MODEL   (effort $EFFORT, timeout $TIMEOUT)"
+echo "==============================================================="
+
+cd "$REPO"
+
+# Models whose reasoning budget is fixed by the model name reject --effort.
+EFFORT_ARG=(--effort "$EFFORT")
+case "$MODEL" in
+  *-thinking|*-high|*-medium|*-low|claude-*) EFFORT_ARG=() ;;
+esac
+
+# --dangerously-skip-permissions: the user's explicit decision (2026-08-13). It
+# is what lets the job disassemble, compile, run its probe and run the tests.
+exec agy -p "$PROMPT" \
+  --dangerously-skip-permissions \
+  --model "$MODEL" \
+  "${EFFORT_ARG[@]}" \
+  --add-dir "$NFM" \
+  --print-timeout "$TIMEOUT"
